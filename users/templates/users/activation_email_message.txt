@@ -1,0 +1,12 @@
+Hola {{ user.username }},
+
+Gracias por registrarte en Radiology Models. Para activar tu cuenta, haz clic en el siguiente enlace:
+
+http://{{ domain }}{% url 'users:activate_user' uidb64=uid token=token %}
+
+Si no puedes hacer clic en el enlace, cópialo y pégalo en la barra de direcciones de tu navegador.
+
+Si no has solicitado una cuenta en Radiology Models, por favor ignora este correo electrónico.
+
+Gracias,
+El equipo de Radiology Models

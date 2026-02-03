@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load blogtags %}
+{% block title %}Buscar - Portal RadiologyModels{% endblock %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="section light-page-header wf-section">
+        <div class="container">
+            <h1 class="heading h1">Resultado de búsqueda</h1>
+        </div>
+    </div>
+    <div class="section wf-section">
+        <div class="container w-container">
+            <div>
+                <div class="large-3-grid search-result-items">
+                {% for post in page_obj %}
+                    <div class="post-box"><a href="{% url 'blog:blog_page' post.title post.id %}" class="post-thumbnail w-inline-block"><img src="{{ post_images|get_item:post.id }}" alt="{{post.title}}" class="image-cover" /></a>
+                        <a href="{% url 'blog:blog_page' post.title post.id %}" class="card-text-link w-inline-block"><h2 class="heading h3">{{post.title}}</h2><p class="paragraph small">{{post.content|truncatechars:100}}</p></a>
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&q={{query}}" class="button w-button">Página anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&q={{query}}" class="button w-button">Página siguiente</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

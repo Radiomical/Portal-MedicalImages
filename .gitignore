@@ -1,0 +1,50 @@
+# ---- Python bytecode / caches ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+ENV/
+
+# ---- Environment variables / secrets ----
+.env
+.env.*
+*.env
+
+# ---- Django ----
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Media uploads (user-generated content)
+media/
+
+# Collected static files (collectstatic output)
+static/
+
+# ---- Testing / coverage ----
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# ---- Build / packaging ----
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- IDEs / editors ----
+.vscode/
+.idea/
+*.swp
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db

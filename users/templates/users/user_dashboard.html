@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Panel de usuario - Portal RadiologyModels{% endblock %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="section wf-section">
+        <div class="container">
+            <h2 class="heading h2">Bienvenido {{user.username}}</h2>
+            <div class="w-form">
+                <form id="user_update_form" method="post" action="{% url 'users:user_dashboard' %}">
+                    {% csrf_token %}
+                    <div class="w-users-userformheader form-card-header">
+                        <h2 class="heading h3">Actualizar información</h2>
+                    </div>
+                    {%for field in form%}
+                        <input type={{field.field.widget.input_type}} class="text-field w-input" placeholder={{field.label}} name={{field.name}} id={{field.name}}>
+                    {%endfor%}
+                    <input type="submit" value="Actualizar contraseña" class="w-users-userformbutton button w-button" />
+                </form>
+                <form id="user_update_form" method="post" action="{% url 'users:update_user_profile' %}">
+                    {% csrf_token %}
+                    {%for field in form2%}
+                        {% if field.name == 'user_work_location' %}
+                            <label for="hospital">Hospital de trabajo</label>
+                            <input type="text" class="text-field w-input" name={{field.name}} id={{field.name}} placeholder="Ejemplo: Hospital Universitario de Salamanca"></input>
+                        {%else%}
+                            <label for="country">{{ field.label }}</label>
+                            <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="w-select">
+                                {% for choice in field.field.choices %}
+                                    <option value="{{ choice.0 }}" {% if choice.0 == field.value %}selected{% endif %}>{{ choice.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        {%endif%}
+                    {%endfor%}
+                    <input type="submit" value="Actualizar información" class="w-users-userformbutton button w-button" />
+                </form>
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}
+                        <div style="display:block" class="w-users-userformerrorstate w-form-fail"><div class="user-form-error-msg">{{error}}</div></div>
+                    {% endfor %}
+                {% endfor %}
+                {%if message%}
+                    <div class="alert alert-success" role="alert">{{message}}</div>
+                {%endif%}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

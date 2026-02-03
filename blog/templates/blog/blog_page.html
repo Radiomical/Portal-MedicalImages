@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% load userstags %}
+{% block title %}{{post.title}} - Portal RadiologyModels{% endblock %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="section daek-page-header wf-section">
+        <div class="container w-container">
+            <div class="w-layout-grid post-page-grid">
+                <div class="text-box">
+                    <h1 class="heading h1 small-margin">{{post.title}}</h1>
+                    <p class="paragraph large">Categoría: {{post.category}}</p>
+                    <p class="paragraph large">{{post.author}}</p>
+                    <p class="paragraph large">{% if academic_year %} Año académico: {{ academic_year }}{% endif %}</p>
+                    <p class="paragraph large">{% if work_location %} Hospital: {{ work_location }}{% endif %}</p>
+                    <p class="paragraph large">{% if medical_specialty %} Especialidad: {{ medical_specialty }}{% endif %}</p>
+                    <p class="paragraph large">{% if country %} País: {{ country }}{% endif %}</p>
+                    {% if can_edit %}
+                        <p class = "paragraph large"> <a href="{% url 'blog:edit_blog' post.id %}" class="btn btn-primary" style="color: white; text-decoration: underline;">Editar entrada</a></p>
+                    {% endif %}
+                </div>
+                <div class="post-header-block"></div>
+            </div>
+        </div>
+    </div>
+    <div class="section small wf-section">
+        <div class="container w-container">
+            <div class="w-layout-grid post-page-grid">
+                <div class="text-box _550px">
+                    {% if post.medical_findings == 'Alta (confirmación anatomopatológica/quirúrgica)' %}
+                        <div class="alert alert-success" role="alert">
+                            {{post.medical_findings}}
+                        </div>
+                    {% elif post.medical_findings == 'Moderada' %}
+                        <div class="alert alert-warning" role="alert">
+                            {{post.medical_findings}}
+                        </div>
+                    {% elif post.medical_findings == 'Baja' %}
+                        <div class="alert alert-danger" role="alert">
+                            {{post.medical_findings}}
+                        </div>
+                    {% endif %}
+                    {% if post.content %}
+                        <h2 class="heading h2 small-margin">Contenido</h1>
+                        <p class="paragraph medium">{{post.content}}</p>
+                    {% endif %}
+                    {% if post.fisiopathology %}
+                        <h2 class="heading h2 small-margin">Fisiopatología</h1>
+                        <p class="paragraph medium">{{post.fisiopathology}}</p>
+                    {% endif %}
+                    {% if post.clinical_signs %}
+                        <h2 class="heading h2 small-margin">Signos</h1>
+                        <p class="paragraph medium">{{post.clinical_signs}}</p>
+                    {% endif %}
+                    {% if post.clinical_case %}
+                        <h2 class="heading h2 small-margin">Clínica</h1>
+                        <p class="paragraph medium">{{post.clinical_case}}</p>
+                    {% endif %}
+                    {% if post.doppler %}
+                        <h2 class="heading h2 small-margin">Doppler</h1>
+                        <p class="paragraph medium">{{post.doppler}}</p>
+                    {% endif %}
+                    {% if post.sequential %}
+                        <h2 class="heading h2 small-margin">Consecutivas</h1>
+                        <p class="paragraph medium">{{post.sequential}}</p>
+                    {% endif %}
+                    {% if post.pediatrics %}
+                        <h2 class="heading h2 small-margin">Pediatría</h1>
+                        <p class="paragraph medium">{{post.pediatrics}}</p>
+                    {% endif %}
+                    {% if post.preparation %}
+                        <h2 class="heading h2 small-margin">Preparación</h1>
+                        <p class="paragraph medium">{{post.preparation}}</p>
+                    {% endif %}
+                    {% if post.medical_report %}
+                        <h2 class="heading h2 small-margin">Informe tipo</h1>
+                        <p class="paragraph medium">{{post.medical_report}}</p>
+                    {% endif %}
+                    {% if post.seram_link %}
+                        <h2 class="heading h2 small-margin">Enlace SERAM</h1>
+                        <p class="paragraph medium"><a href="{{post.seram_link}}" target="_blank" class="btn btn-primary" style="text-decoration: underline;">{{post.seram_link}}</a></p>
+
+                    {% endif %}
+                    {% if post.radiopedia_link %}
+                        <h2 class="heading h2 small-margin">Enlace Radiopaedia</h1>
+                        <p class="paragraph medium"><a href="{{post.radiopedia_link}}" target="_blank" class="btn btn-primary" style="text-decoration: underline;">{{post.radiopedia_link}}</a></p>
+                    {% endif %}
+                    {% if filepost.cie_11_tagging %}
+                        <h2 class="heading h2 small-margin">Etiqueta CIE 11</h1>
+                        {% if filepost.cie_11_tagging == 'Otras' %}
+                            <p class="paragraph medium">{{filepost.other_interested_region}}</p>
+                        {% else %}
+                            <p class="paragraph medium">{{filepost.cie_11_tagging}}</p>
+                        {% endif %}
+                    {% endif %}
+                    {% if filepost.interested_region %}
+                        <h2 class="heading h2 small-margin">Región de interés</h1>
+                        <p class="paragraph medium">{{filepost.interested_region}}</p>
+                    {% endif %}
+                </div>
+                {% if axial_post_images_list or coronal_post_images_list or sagital_post_images_list %}
+                    <div class="col-md-6">
+                        {% if axial_post_images_list %}
+                        <label>Corte Axial/1ºsecuencia</label>
+                        <div class="image-container">
+                            {% for image in axial_post_images_list %}
+                                <img src="{{image}}" class="image">
+                            {% endfor %}
+                        </div>
+                        {% if axial_description %}
+                            <button id="modalBtn-axial" class="button">Descripción del caso</button>
+                            <div id="simpleModal-axial" class="modal">
+                                <div class="modal-content">
+                                    <span class="closeBtn"></span>
+                                    <h2>Descripción del caso</h2>
+                                    <p>{{axial_description}}</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if coronal_post_images_list %}
+                        <label>Corte Coronal/2ºsecuencia</label>
+                        <div class="image-container">
+                            {% for image in coronal_post_images_list %}
+                                <img src="{{image}}" class="image">
+                            {% endfor %}
+                        </div>
+                        {% if coronal_description %}
+                            <button id="modalBtn-coronal" class="button">Descripción del caso</button>
+                            <div id="simpleModal-coronal" class="modal">
+                                <div class="modal-content">
+                                    <span class="closeBtn"></span>
+                                    <h2>Descripción del caso</h2>
+                                    <p>{{coronal_description}}</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if sagital_post_images_list %}
+                        <label>Corte Sagital/3ºsecuencia</label>
+                        <div class="image-container">
+                            {% for image in sagital_post_images_list %}
+                                <img src="{{image}}" class="image">
+                            {% endfor %}
+                        </div>
+                        {% if sagital_description %}
+                            <button id="modalBtn-sagital" class="button">Descripción del caso</button>
+                            <div id="simpleModal-sagital" class="modal">
+                                <div class="modal-content">
+                                    <span class="closeBtn"></span>
+                                    <h2>Descripción del caso</h2>
+                                    <p>{{sagital_description}}</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.querySelectorAll('.image-container').forEach(function(scrollContainer) {
+        // Agregar el estilo touch-action: none al contenedor de imágenes
+        scrollContainer.style.touchAction = 'pan-y';
+
+        let isScrolling = false;
+        let startY = 0;
+        let currentSlideIndex = 0;
+
+        scrollContainer.addEventListener('touchstart', function(e) {
+            isScrolling = true;
+            startY = e.touches[0].clientY;
+        });
+
+        scrollContainer.addEventListener('touchmove', function(e) {
+            if (!isScrolling) return;
+
+            e.preventDefault();
+
+            const touchY = e.touches[0].clientY;
+            const deltaY = startY - touchY;
+            startY = touchY;
+
+            const scrollPosition = scrollContainer.scrollTop;
+            const containerHeight = scrollContainer.clientHeight;
+            const imageHeight = scrollContainer.querySelector('img').clientHeight;
+            const diapositiva = containerHeight / imageHeight;
+            const imageCount = scrollContainer.querySelectorAll('img').length;
+
+            let scrollTargetIndex = currentSlideIndex;
+
+            const sensitivityFactor = 2;
+
+            if (deltaY > 0) {
+                scrollTargetIndex = scrollTargetIndex + sensitivityFactor;
+            } else if (deltaY < 0) {
+                scrollTargetIndex = scrollTargetIndex - sensitivityFactor;
+            }
+
+            scrollTargetIndex = Math.max(0, Math.min(imageCount - 1, scrollTargetIndex));
+
+            const targetSlide = scrollContainer.querySelectorAll('img')[scrollTargetIndex];
+            targetSlide.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'instant' });
+
+            const targetScrollPosition = scrollTargetIndex * imageHeight;
+            scrollContainer.scrollTop = targetScrollPosition;
+
+            currentSlideIndex = scrollTargetIndex;
+        });
+
+        scrollContainer.addEventListener('touchend', function() {
+            isScrolling = false;
+        });
+
+        scrollContainer.addEventListener('scroll', function(e) {
+            e.preventDefault();
+        
+
+        const scrollPosition = scrollContainer.scrollTop;
+        const containerHeight = scrollContainer.clientHeight;
+        const imageHeight = scrollContainer.querySelector('img').clientHeight;
+        const diapositiva = (containerHeight / imageHeight);
+        const imageCount = scrollContainer.querySelectorAll('img').length;
+        const currentSlideIndex = Math.round(scrollPosition / imageHeight);
+
+        let scrollTargetIndex = currentSlideIndex;
+
+        const sensitivityFactor = 2;
+
+        if (e.deltaY > 0) {
+            scrollTargetIndex = scrollTargetIndex + sensitivityFactor;
+        } else if (e.deltaY < 0) {
+            scrollTargetIndex = scrollTargetIndex - sensitivityFactor;
+        }
+
+        const targetSlide = scrollContainer.querySelectorAll('img')[scrollTargetIndex];
+        targetSlide.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'instant' });
+
+        const targetScrollPosition = scrollTargetIndex * imageHeight;
+        scrollContainer.scrollTop = targetScrollPosition;
+    });
+    });
+
+
+
+    const imageContainers = document.querySelectorAll('.image-container');
+    let currentZoomedElement = null;
+
+    imageContainers.forEach((imageContainer) => {
+    imageContainer.addEventListener('click', (event) => {
+        if (event.target.tagName === 'IMG') {
+        if (currentZoomedElement) {
+            currentZoomedElement.style.transform = null;
+            currentZoomedElement.style.marginBottom = null;
+        }
+        if (currentZoomedElement !== imageContainer) {
+            imageContainer.style.transform = 'scale(2)';
+            imageContainer.style.marginBottom = '300px';
+            currentZoomedElement = imageContainer;
+        } else {
+            currentZoomedElement = null;
+        }
+        }
+    });
+    });
+
+
+    document.addEventListener('click', (event) => {
+    if (currentZoomedElement && !currentZoomedElement.contains(event.target)) {
+        currentZoomedElement.style.transform = null;
+        currentZoomedElement.style.marginBottom = null;
+        currentZoomedElement = null;
+    }
+    });
+
+    const modalBtns_axial = document.querySelectorAll('#modalBtn-axial');
+    const modalBtns_coronal = document.querySelectorAll('#modalBtn-coronal');
+    const modalBtns_sagital = document.querySelectorAll('#modalBtn-sagital');
+    const modal_axial = document.getElementById('simpleModal-axial');
+    const modal_coronal = document.getElementById('simpleModal-coronal');
+    const modal_sagital = document.getElementById('simpleModal-sagital');
+    const closeBtn = document.querySelector('.closeBtn');
+
+    modalBtns_axial.forEach((btn) => {
+        btn.addEventListener('click', () => {
+        modal_axial.style.display = 'block';
+        });
+    });
+
+    modalBtns_coronal.forEach((btn) => {
+        btn.addEventListener('click', () => {
+        modal_coronal.style.display = 'block';
+        });
+    });
+
+    modalBtns_sagital.forEach((btn) => {
+        btn.addEventListener('click', () => {
+        modal_sagital.style.display = 'block';
+        });
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === modal_axial) {
+        modal_axial.style.display = 'none';
+        }
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === modal_coronal) {
+        modal_coronal.style.display = 'none';
+        }
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === modal_sagital) {
+        modal_sagital.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

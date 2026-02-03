@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Inicio de sesión - Portal RadiologyModels{% endblock %}
+{% block content %}
+<div class="w-users-userformpagewrap full-page-wrapper">
+    <div class="w-users-userloginformwrapper admin-form-card">
+        <form id="login_form" method="post" action="{% url 'users:login' %}">
+            {% csrf_token %}
+            <div class="w-users-userformheader form-card-header">
+                <h2 class="heading h3">Log in</h2>
+            </div>
+            {%for field in form%}
+            <input type={{field.field.widget.input_type}} class="text-field w-input" placeholder={{field.label}}
+                name={{field.name}} id={{field.name}} required>
+            {%endfor%}
+            <input type="submit" value="Log In" class="w-users-userformbutton button w-button" />
+            <div class="w-users-userformfooter form-card-footer"><span>¿No tienes cuenta?</span><a
+                    href="{% url 'users:signup' %}">Registrate</a><a href="{% url 'users:reset_password' %}" class="below-card-link">¿Has olvidado tu contraseña?</a></div>
+        </form>
+        {%if error_message%}
+        <div style="display:block" class="w-users-userformerrorstate w-form-fail">
+            <div class="user-form-error-msg">
+                {{error_message}}
+            </div>
+        </div>
+        {%endif%}
+    </div>
+</div>
+{% endblock %}

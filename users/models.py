@@ -1,0 +1,90 @@
+import pycountry
+from django.db import models
+from blog.models import Post
+from django.contrib.auth.models import User
+from django.db.models.fields import BLANK_CHOICE_DASH
+
+
+def images_path(instance, filename):
+    return 'images/user_{0}/post_{1}/{2}'.format(instance.post.author.username, instance.post.id, filename)
+
+class UserProfile(models.Model):
+    academic_year_list = ['Estudiante','R0', 'R1', 'R2','R3', 'R4','R5', 'Adjunto']
+    medical_specialty_list = ['Radiología pediátrica', 'Radiología ginecológica','Radiología de abdomen', 'Neurorradiología', 'Radiología intervencionista', 'Radiología musculoesquelética', 'Radiología general']
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    country = models.CharField(max_length=100, choices=[(country.name, country.name) for country in pycountry.countries], blank=True, null=True)
+    academic_year = models.CharField(max_length=100, choices=[(academic_year, academic_year) for academic_year in academic_year_list], blank=True, null=True)
+    work_location = models.CharField(max_length=100, blank=True, null=True)
+    medical_specialty = models.CharField(max_length=100, choices=[(medical_specialty, medical_specialty) for medical_specialty in medical_specialty_list], blank=True, null=True)
+
+class FilePost(models.Model):
+    USE_DATA_CHOICES = (
+        ('Si', 'Si'),
+        ('No', 'No'),
+    )
+
+    JPEG = 'JPEG'
+    DICOM = 'DICOM'
+    FORMAT_CHOICES = (
+        ('JPEG, JPG', 'JPEG/JPG'),
+        (DICOM, 'DICOM'),
+    )
+
+    INTERESTED_REGION_CHOICES = (
+        BLANK_CHOICE_DASH[0],
+        ('Segmento 1', 'Segmento 1'),
+        ('Segmento 2', 'Segmento 2'),
+        ('Segmento 3', 'Segmento 3'),
+        ('Segmento 4', 'Segmento 4'),
+        ('Segmento 5', 'Segmento 5'),
+        ('Segmento 6', 'Segmento 6'),
+        ('Segmento 7', 'Segmento 7'),
+        ('Segmento 8', 'Segmento 8'),
+        ('Difusa', 'Difusa'),
+        ('Subcapsular', 'Subcapsular')
+    )
+
+    CIE_11_TAGGING_CHOICES = (
+        BLANK_CHOICE_DASH[0],
+        ('DB90 Enfermedad infecciosa del hígado', 'DB90 Enfermedad infecciosa del hígado'),
+        ('DB91 Insuficiencia hepática aguda o subaguda', 'DB91 Insuficiencia hepática aguda o subaguda'),
+        ('DB92/DB94 Hepatopatía grasa', 'DB92/DB94 Hepatopatía grasa'),
+        ('DB93 Fibrosis o cirrosis hepática', 'DB93 Fibrosis o cirrosis hepática'),
+        ('DB95 Hepatopatía tóxica o provocada por medicamentos', 'DB95 Hepatopatía tóxica o provocada por medicamentos'),
+        ('DB96 Enfermedad hepática autoinmune', 'DB96 Enfermedad hepática autoinmune'),
+        ('DB97 Algunas hepatopatías inflamatorias especificadas', 'DB97 Algunas hepatopatías inflamatorias especificadas'),
+        ('DB98 Trastornos vasculares del hígado', 'DB98 Trastornos vasculares del hígado'),
+        ('DB99 Algunas enfermedades especificadas del hígado', 'DB99 Algunas enfermedades especificadas del hígado'),
+        ('Neoplasias del hígado', 'Neoplasias del hígado'),
+        ('LB20.0 Anomalías estructurales del desarrollo prenatal del hígado', 'LB20.0 Anomalías estructurales del desarrollo prenatal del hígado'),
+        ('5C90 Enfermedad hepática metabólica o transportadora', '5C90 Enfermedad hepática metabólica o transportadora'),
+        ('Hepatitis viral', 'Hepatitis viral'),
+        ('DB9Z Enfermedades del hígado, sin especificación', 'DB9Z Enfermedades del hígado, sin especificación'),
+        ('Otras', 'Otras'),
+    )
+
+    POST_CATEGORIES_CHOICE = (
+        ('Abdomen', 'Abdomen'),
+        ('Torax', 'Torax'),
+        ('Ginecología', 'Ginecología'),
+        ('Pediatría', 'Pediatría'),
+        ('Neurología', 'Neurología'),
+        ('Musculoesquelético', 'Musculoesquelético'),
+        ('Otras', 'Otras'),
+    )
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    format = models.CharField(max_length=9, choices=FORMAT_CHOICES, null=True, blank=True)
+    axial_images = models.ImageField(upload_to=images_path, null=True, blank=True)
+    axial_description = models.CharField(max_length=500, blank=True, null=True)
+    coronal_images = models.ImageField(upload_to=images_path, null=True, blank=True)
+    category = models.CharField(max_length=20, choices=POST_CATEGORIES_CHOICE, default='Abdomen')
+    coronal_description = models.CharField(max_length=500, blank=True, null=True)
+    sagital_images = models.ImageField(upload_to=images_path, null=True, blank=True)
+    sagital_description = models.CharField(max_length=500, blank=True, null=True)
+    header_image = models.ImageField(upload_to=images_path)
+    accepted_data_use = models.CharField(max_length=2, choices=USE_DATA_CHOICES, blank=True, null=True)
+    cie_11_tagging = models.CharField(max_length=100, choices=CIE_11_TAGGING_CHOICES, blank=True, null=True)
+    interested_region = models.CharField(max_length=100, choices=INTERESTED_REGION_CHOICES, blank=True, null=True)
+    other_interested_region = models.CharField(max_length=100, blank=True, null=True)
