@@ -25,7 +25,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', False)
 
-ALLOWED_HOSTS = ['74.234.177.251','portal.radiologymodels.com','localhost','www.portal.radiologymodels.com','https://portal.radiologymodels.com']
+ALLOWED_HOSTS = ['xxx','portal.radiologymodels.com','xxx','www.portal.radiologymodels.com','https://portal.radiologymodels.com']
 
 
 # Application definition
@@ -45,14 +45,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
+    'xxx',
+    
 ]
 
 ROOT_URLCONF = 'portal.urls'
@@ -153,16 +147,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-EMAIL_BACKEND= "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST= "smtp.gmail.com"
+EMAIL_BACKEND= "xxx"
+EMAIL_HOST= "xxx"
 EMAIL_USE_TLS= True
-EMAIL_PORT= 587
-EMAIL_HOST_USER= os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD= os.getenv('EMAIL_HOST_PASSWORD')
+EMAIL_PORT= xxx
+EMAIL_HOST_USER= os.getenv('xxx')
+EMAIL_HOST_PASSWORD= os.getenv('xxx')
 
-DEFAULT_FROM_EMAIL = 'hola@radiologymodels.com'
+DEFAULT_FROM_EMAIL = 'xxx'
 
-PASSWORD_RESET_TIMEOUT = 86400 # 1 day
+PASSWORD_RESET_TIMEOUT = xxx # 1 day
 
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'api.helpers.utils.custom_exception_handler',
@@ -170,3 +164,4 @@ REST_FRAMEWORK = {
 
 DATA_UPLOAD_MAX_NUMBER_FILES = None
 FILE_UPLOAD_MAX_MEMORY_SIZE = 419430400 # 400 MB
+
