@@ -10,3 +10,10 @@ body.clinical{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 In
 @media(max-width:900px){.site-nav{align-items:flex-start;padding:18px 24px;gap:16px;flex-wrap:wrap}.site-links{gap:16px}.content-width{padding-left:24px;padding-right:24px}.case-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.case-columns{grid-template-columns:1fr}.series-frame img{max-height:520px}.clinical-panel{padding:8px 22px}.site-footer{padding:20px 24px;flex-wrap:wrap}.clinical-hero{padding-top:35px}.site-brand{font-size:17px}}
 @media(max-width:560px){.content-width{padding-left:18px;padding-right:18px}.site-nav{padding:16px 18px}.site-links{width:100%;gap:17px}.site-links>a{font-size:12px}.site-links .clinical-button{padding:8px 12px}.preview-label{margin-left:auto;font-size:9px}.clinical-hero{padding-top:28px;padding-bottom:30px}.clinical-hero h1{font-size:35px}.clinical-hero>p{font-size:14px}.case-grid{grid-template-columns:1fr;gap:20px}.case-cover{height:205px}.case-card-body{padding:18px}.section-heading{align-items:flex-end}.section-heading h2{font-size:23px}.secondary-link{font-size:11px}.clinical-search{gap:0}.clinical-search input{padding:10px 8px}.clinical-search input::placeholder{font-size:11px}.clinical-search button{padding:10px 14px}.image-series{padding:13px;border-radius:16px}.series-heading span{font-size:7px}.series-controls{gap:8px}.series-frame img{max-height:360px}.case-heading{flex-direction:column;gap:12px}.clinical-panel{padding:3px 20px}.case-columns{gap:15px}.site-footer{flex-direction:column;padding:20px 18px;gap:5px}.pagination{gap:10px;font-size:11px}.pagination a{padding:9px 10px}.listing-section{padding-top:28px}}
 @media(prefers-reduced-motion:reduce){.case-card{transition:none}.case-card:hover{transform:none}}
+
+/* Preserved legacy form presentation, compatible with strict CSP. */
+.legacy-style-1{display:block}
+.legacy-style-2{color: rgb(255, 0, 0); text-align: center;}
+.legacy-style-3{text-align: justify;}
+.legacy-style-4{margin-top: 30px}
+.legacy-style-5{display: none;}
