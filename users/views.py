@@ -6,7 +6,8 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import transaction, IntegrityError
+from .email_policy import email_user
 from django.contrib.sites.shortcuts import get_current_site
 from django.conf import settings
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -18,7 +19,6 @@ from .forms import SignupForm, LoginForm, ResetPasswordForm, ChangePasswordForm,
 from .models import Post, FilePost, UserProfile
 from django.contrib.auth.models import User
 from blog.models import Post
-from blog.views import retrieve_first_post_image
 
 def login(request):
     if request.method == 'GET':
@@ -32,7 +32,7 @@ def login(request):
     elif request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
-            user = User.objects.filter(email=form.cleaned_data['email']).first()
+            user = email_user(form.cleaned_data['email'])
             if user and user.check_password(form.cleaned_data['password']):
                 if user.is_active:
                     auth_login(request, user)
@@ -68,9 +68,13 @@ def signup(request):
             user = form.save(commit=False)
             user.password = make_password(form.cleaned_data['password1'])
             user.is_active = False
-            user.save()
-
-            UserProfile.objects.create(user=user)
+            try:
+                with transaction.atomic():
+                    user.save()
+                    UserProfile.objects.create(user=user)
+            except IntegrityError:
+                form.add_error(None, 'No se pudo crear la cuenta. Comprueba los datos e inténtalo de nuevo.')
+                return render(request, 'users/signup.html', {'form': form})
 
             current_site = get_current_site(request)
 
@@ -117,7 +121,7 @@ def update_user_profile(request):
             form = ChangePasswordForm()
             form2 = UserUpdateForm(request.POST)
             if form2.is_valid():
-                user = User.objects.get(email=request.user.email)
+                user = request.user
                 country = form2.cleaned_data['user_country']
                 academic_year = form2.cleaned_data['user_academic_year']
                 work_location = form2.cleaned_data['user_work_location']
@@ -150,7 +154,7 @@ def user_dashboard(request):
             form = ChangePasswordForm(request.POST)
             form2 = UserUpdateForm()
             if form.is_valid():
-                user = User.objects.get(email=request.user.email)
+                user = request.user
                 user.password = make_password(form.cleaned_data['password1'])
                 user.save()
 
@@ -247,7 +251,7 @@ def reset_password(request):
     elif request.method == 'POST':
         form = ResetPasswordForm(request.POST)
         if form.is_valid():
-            user = User.objects.filter(email=form.cleaned_data['email']).first()
+            user = email_user(form.cleaned_data['email'])
             if user:
                 user.save()
 
@@ -298,10 +302,7 @@ def reset_password_confirm(request, uidb64, token, *args, **kwargs):
                 else:
                     return render(request, 'users/reset_password.html', {'form': form, 'change_password': True, 'uidb64': uidb64, 'token': token})
             else:
-                posts = Post.objects.order_by('-date_posted')[:5]
-                post_images = retrieve_first_post_image(posts)
-
-                return render(request, 'blog/home.html', {'posts': posts, 'post_images': post_images})
+                return redirect(reverse('blog:home'))
         else:
             return redirect(reverse('blog:home'))
     else:
