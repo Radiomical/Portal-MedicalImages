@@ -99,3 +99,17 @@ separate verification before publication or reuse of real cases.
 - Handle case authors without a profile.
 - Make inherited DICOM conversion use the configured media directory.
 - Add synthetic regression tests, container definition and CI checks.
+
+### Clinical interface preview
+
+The Clinical F shell, case cards, search and case viewer use local CSS/JavaScript
+and system fonts. The shell no longer loads analytics, remote fonts, jQuery or
+the inherited Webflow JavaScript bundle. A series has a range control, previous /
+next buttons and keyboard arrows; without JavaScript, every image remains visible.
+There are no measurements, window presets or diagnostic claims. The account and
+editor forms retain their inherited layouts inside the new shell. UI copy is in
+English; stored case content and historical choice labels are preserved.
+
+Logout is POST-only with CSRF protection. The public synthetic preview continues
+to block writes and private/account routes. This interface change is not a
+production cutover and does not enable remote object storage.

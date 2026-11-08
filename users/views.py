@@ -48,14 +48,11 @@ def login(request):
         return redirect('blog:home')
 
 def logout(request):
-    if request.method == 'GET':
-        if request.user.is_authenticated:
-            auth_logout(request)
-            return redirect(reverse('users:login'))
-        else:
-            return redirect(reverse('users:login'))
-    else:
-        return redirect('blog:home')
+    if request.method != 'POST':
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['POST'])
+    auth_logout(request)
+    return redirect(reverse('users:login'))
 
 def signup(request):
     if request.method == 'GET':

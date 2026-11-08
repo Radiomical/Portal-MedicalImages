@@ -46,7 +46,7 @@ class PortalSmokeTests(TestCase):
     def test_login_profile_and_logout(self):
         self.client.post("/users/login/", {"email": self.user.email, "password": "Synthetic-Test-3281!"})
         self.assertEqual(self.client.get("/users/profile/").status_code, 200)
-        self.assertEqual(self.client.get("/users/logout/").status_code, 302)
+        self.assertEqual(self.client.post("/users/logout/").status_code, 302)
     def test_edit_requires_owner(self):
         other = User.objects.create_user("other", "other@example.invalid", "Synthetic-Test-3281!")
         self.client.force_login(other)

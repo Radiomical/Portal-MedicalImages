@@ -2190,7 +2190,7 @@ textarea.w-input, textarea.w-select {
 
 .w-checkbox-input--inputType-custom.w--redirected-checked {
   background-color: #3898ec;
-  background-image: url("https://d3e54v103j8qbb.cloudfront.net/static/custom-checkbox-checkmark.589d534424.svg");
+  background-image: none;
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;
@@ -2236,7 +2236,7 @@ textarea.w-input, textarea.w-select {
 
 .w-checkbox-input--inputType-custom.w--redirected-checked {
   background-color: #3898ec;
-  background-image: url("https://d3e54v103j8qbb.cloudfront.net/static/custom-checkbox-checkmark.589d534424.svg");
+  background-image: none;
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;
@@ -3775,7 +3775,7 @@ figcaption {
   height: 36px;
   color: #1d1d1d;
   background-color: #f5f6f7;
-  background-image: url("https://uploads-ssl.webflow.com/649af896d92dc3b52a49762e/649af896d92dc3b52a4976fe_MagnifyingGlass%20Grey.svg");
+  background-image: none;
   background-position: 8px;
   background-repeat: no-repeat;
   background-size: 18px;

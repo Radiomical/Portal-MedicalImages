@@ -26,7 +26,7 @@ def all_blogs(request):
     paginator = Paginator(posts, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    post_images = retrieve_first_post_image(posts)
+    post_images = retrieve_first_post_image(page_obj.object_list)
 
     return render(request, 'blog/all_blog_pages.html', {'post_images': post_images, 'page_obj': page_obj})
 
@@ -93,13 +93,13 @@ def search(request):
 
     if query:
         posts = Post.objects.filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-date_posted')
-        post_images = retrieve_first_post_image(posts)
     else:
         posts = Post.objects.none()
 
     paginator = Paginator(posts, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    post_images = retrieve_first_post_image(page_obj.object_list)
 
     return render(request, 'blog/search_blog.html', {'posts': posts, 'post_images': post_images, 'page_obj': page_obj, 'query': query})
 

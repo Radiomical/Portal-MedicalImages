@@ -1,0 +1,1 @@
+<form action="{% url 'blog:search' %}" method="get" class="clinical-search" role="search"><label class="sr-only" for="case-search">Search cases</label><input id="case-search" type="search" name="q" value="{{ query|default:'' }}" placeholder="Search by condition, sign or keyword" maxlength="256"><button type="submit">Search</button></form>

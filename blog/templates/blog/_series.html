@@ -1,0 +1,6 @@
+<section class="image-series" aria-label="{{ series_name }} image series" data-series>
+<div class="series-heading"><h2>{{ series_name }}</h2><span>EDUCATIONAL IMAGES</span></div>
+<div class="series-frame" tabindex="0" aria-label="{{ series_name }} images. Use left and right arrow keys to change slice.">{% for image in images %}<img src="{{ image }}" alt="{{ series_name }} slice {{ forloop.counter }} of {{ images|length }}" data-slice>{% endfor %}</div>
+<div class="series-controls" hidden><button type="button" data-previous aria-label="Previous {{ series_name }} slice">←</button><label class="sr-only" for="slice-{{ series_id }}">{{ series_name }} slice</label><input id="slice-{{ series_id }}" type="range" min="1" max="{{ images|length }}" value="1" step="1"><output aria-live="polite">1 / {{ images|length }}</output><button type="button" data-next aria-label="Next {{ series_name }} slice">→</button></div>
+{% if description %}<details class="series-description"><summary>Series description</summary><p>{{ description|linebreaksbr }}</p></details>{% endif %}
+</section>
