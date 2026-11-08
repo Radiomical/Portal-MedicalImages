@@ -35,4 +35,4 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email']
 
 def error_page(request, error_code):
-    return render(request, 'api/401.html', {'error_code': error_code})
+    return render(request, 'api/401.html', {'error_code': error_code}, status=error_code)
