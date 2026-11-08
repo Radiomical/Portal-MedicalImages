@@ -78,3 +78,19 @@ CSRF_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
 if env_bool("TRUST_PROXY_HTTPS"):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Opt-in only: credentials are server-side and never injected into templates.
+MEDIA_STORAGE = os.environ.get('MEDIA_STORAGE', 'filesystem')
+R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL', '')
+R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '')
+R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
+R2_IMAGE_BUCKET = os.environ.get('R2_IMAGE_BUCKET', '')
+R2_DICOM_BUCKET = os.environ.get('R2_DICOM_BUCKET', '')
+R2_SIGNED_URL_SECONDS = int(os.environ.get('R2_SIGNED_URL_SECONDS', '300'))
+if MEDIA_STORAGE == 'r2':
+    STORAGES = {
+        'default': {'BACKEND': 'portal.storage.PrivateImageStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+elif MEDIA_STORAGE != 'filesystem':
+    raise ImproperlyConfigured('MEDIA_STORAGE must be filesystem or r2')
