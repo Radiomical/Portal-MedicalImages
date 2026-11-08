@@ -44,7 +44,9 @@ jobs:
         run: |
           curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz -o /tmp/trivy.tar.gz
           echo 'bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf  /tmp/trivy.tar.gz' | sha256sum -c -
-          tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf /tmp/trivy.tar.gz -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
       - name: Audit both images and gate fixable high/critical findings
         run: ./scripts/image-audit.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
