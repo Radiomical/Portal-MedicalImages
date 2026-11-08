@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from users.uploads import prepare_images, store_case_images
+from users.case_media import sync_uploaded_case
 import os
 from django.conf import settings
 from django.shortcuts import render, redirect
@@ -198,7 +199,9 @@ def new_post(request):
                         post_instance = form.save(commit=False)
                         post_instance.author = request.user
                         post_instance.save()
-                        store_case_images(post_instance, form2.cleaned_data, prepared)
+                        object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
+                        if settings.CASE_MEDIA_DUAL_WRITE:
+                            sync_uploaded_case(post_instance.pk, object_metadata)
                     return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Case created.', 'error': False})
                 except ValidationError as error:
                     form2.add_error(None, error)

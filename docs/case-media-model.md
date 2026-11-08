@@ -59,3 +59,36 @@ for display metadata only. This never deletes physical media. OriginalDicom has
 PROTECT to Post and derived images use PROTECT to OriginalDicom, preserving the
 existing retained-original guard. No user/account deletion policy is changed in
 this stage. Reconciliation and final retention/deletion policy remain separate.
+
+## Staged canonical dual-write
+
+`CASE_MEDIA_DUAL_WRITE` defaults to false. When enabled in an isolated test
+configuration, canonical create/edit saves the legacy rows and then refreshes
+the normalized DB projection within the same transaction, after obsolete legacy
+rows are removed. A projection failure rolls both sets of DB changes back.
+Objects already written are not deleted on a DB failure; reconcile them as
+unreferenced, do not blindly retry/delete. This is not a distributed transaction.
+
+For new objects, the manifest records size and SHA256 of JPEG bytes sent and
+known retained-original lineage with conversion version `educational-jpeg-v1`.
+Object integrity remains unverified until separate read-back reconciliation;
+review remains pending. A re-encoded JPEG is not proof of anonymization.
+
+Migration0047 marks every pre-existing projection stale by default. Explicit
+backfill/verification can clear it when source equivalence holds. Normal ORM
+Post/FilePost saves and FilePost deletion, including the current admin, invalidate
+existing projections. Canonical dual-write clears stale only after matching the
+complete refreshed projection. Refresh resets display review to pending and case
+review to legacy-unverified, never carrying approval onto changed images.
+
+Direct SQL, `QuerySet.update`, `bulk_update` and `bulk_create` bypass save signals.
+They must not be used for active media mutations without explicit invalidation
+and reconciliation. Current normalized readers are NOT activated by this stage;
+legacy code is still authoritative, so this limitation cannot silently serve
+stale normalized data. A future reader activation must account for every write
+path and must fall back on stale/unmigrated cases. Do not enable a reader merely
+because the dual-write flag exists.
+
+No new object is deleted by refreshing its display manifest. Retained original
+manifests remain protected. No production flag, data, admin configuration or
+public preview was changed during development.

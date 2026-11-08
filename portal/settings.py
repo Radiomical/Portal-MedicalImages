@@ -104,3 +104,6 @@ PRIVATE_DICOM_ROOT = Path(os.environ.get('PRIVATE_DICOM_ROOT', str(BASE_DIR / '.
 DATABASE_SSLROOTCERT = os.environ.get('DATABASE_SSLROOTCERT', '')
 if DATABASE_SSLROOTCERT and DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
     DATABASES['default']['OPTIONS']['sslrootcert'] = DATABASE_SSLROOTCERT
+
+# Staged manifest dual-write only. Legacy reads remain active.
+CASE_MEDIA_DUAL_WRITE = env_bool('CASE_MEDIA_DUAL_WRITE', False)

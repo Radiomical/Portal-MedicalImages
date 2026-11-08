@@ -83,6 +83,8 @@ def store_case_images(post, cleaned, prepared):
     """
     cover = next(item for item in prepared if item.field == 'header_image')
     header_key = default_storage.save('images/' + uuid.uuid4().hex + '.jpg', ContentFile(cover.jpeg))
+    object_metadata = {header_key: {'byte_size': len(cover.jpeg), 'sha256': hashlib.sha256(cover.jpeg).hexdigest(), 'storage_location': settings.MEDIA_STORAGE, 'original_id': None, 'conversion_version': 'educational-jpeg-v1'}}
+    original_keys = [(cover, header_key)]
     retain = cleaned['format'] == 'DICOM' and cleaned.get('accepted_data_use') == 'Si'
     common = {key: cleaned.get(key) for key in ['format', 'accepted_data_use', 'cie_11_tagging', 'interested_region', 'other_interested_region']}
     if common['accepted_data_use'] != 'Si':
@@ -92,10 +94,12 @@ def store_case_images(post, cleaned, prepared):
         FilePost.objects.create(post=post, header_image=header_key, **common)
     for item in series:
         key = default_storage.save('images/' + uuid.uuid4().hex + '.jpg', ContentFile(item.jpeg))
+        original_keys.append((item, key))
+        object_metadata[key] = {'byte_size': len(item.jpeg), 'sha256': hashlib.sha256(item.jpeg).hexdigest(), 'storage_location': settings.MEDIA_STORAGE, 'original_id': None, 'conversion_version': 'educational-jpeg-v1'}
         description = item.field.replace('_images', '_description')
         FilePost.objects.create(post=post, header_image=header_key, **{item.field: key, description: cleaned.get(description, '')}, **common)
     if retain:
-        for item in prepared:
+        for item, display_key in original_keys:
             key = 'originals/' + uuid.uuid4().hex + '.dcm'
             if settings.MEDIA_STORAGE == 'r2':
                 quarantine_dicom(ContentFile(item.original), key)
@@ -104,5 +108,8 @@ def store_case_images(post, cleaned, prepared):
                 private = FileSystemStorage(location=settings.PRIVATE_DICOM_ROOT, file_permissions_mode=0o600, directory_permissions_mode=0o700)
                 key = private.save(key, ContentFile(item.original))
                 location = 'filesystem'
-            OriginalDicom.objects.create(post=post, object_key=key, storage_location=location,
+            original = OriginalDicom.objects.create(post=post, object_key=key, storage_location=location,
                 sha256=hashlib.sha256(item.original).hexdigest(), byte_size=len(item.original))
+
+            object_metadata[display_key]['original_id'] = original.pk
+    return object_metadata
