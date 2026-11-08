@@ -9,6 +9,7 @@ from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 
 def validate_key(name):
@@ -30,9 +31,9 @@ class PrivateImageStorage(Storage):
         if any(not getattr(settings, k, '') for k in required):
             raise ImproperlyConfigured('Private object storage configuration is incomplete')
         endpoint = urlparse(settings.R2_ENDPOINT_URL)
-        if endpoint.scheme != 'https' or not endpoint.hostname or not endpoint.hostname.endswith('.r2.cloudflarestorage.com') or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment or endpoint.path not in {'', '/'}:
+        if endpoint.scheme != 'https' or not endpoint.hostname or not endpoint.hostname.endswith('.r2.cloudflarestorage.com') or endpoint.username or endpoint.password or endpoint.netloc != endpoint.hostname or endpoint.query or endpoint.fragment or endpoint.path not in {'', '/'}:
             raise ImproperlyConfigured('Use the HTTPS R2 S3 endpoint from the dashboard')
-        return boto3.client('s3', endpoint_url=settings.R2_ENDPOINT_URL, region_name='auto',
+        return boto3.client('s3', endpoint_url=settings.R2_ENDPOINT_URL, region_name='auto', config=Config(signature_version='s3v4'),
                             aws_access_key_id=settings.R2_ACCESS_KEY_ID,
                             aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY)
 
@@ -55,8 +56,8 @@ class PrivateImageStorage(Storage):
     def _save(self, name, content):
         name = self._image_key(name)
         types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
-        self.client.upload_fileobj(content, self.bucket, name,
-            ExtraArgs={'ContentType': types[PurePosixPath(name).suffix.lower()], 'CacheControl': 'private, max-age=60'})
+        create_object(self.client, self.bucket, name, content,
+                      types[PurePosixPath(name).suffix.lower()], 'private, max-age=60')
         return name
 
     def exists(self, name):
@@ -95,6 +96,22 @@ def quarantine_dicom(content, key):
     if not getattr(settings, 'R2_DICOM_BUCKET', '') or settings.R2_DICOM_BUCKET == settings.R2_IMAGE_BUCKET:
         raise ImproperlyConfigured('DICOM quarantine must use a distinct private bucket')
     storage = PrivateImageStorage()
-    storage.client.upload_fileobj(content, settings.R2_DICOM_BUCKET, key,
-        ExtraArgs={'ContentType': 'application/dicom', 'CacheControl': 'no-store'})
+    create_object(storage.client, settings.R2_DICOM_BUCKET, key, content,
+                  'application/dicom', 'no-store')
     return key
+
+
+def create_object(client, bucket, key, content, content_type, cache_control):
+    """Atomic create-only write: never replace an existing retained object.
+
+    A failed or uncertain write must be reconciled by the caller, not retried
+    without a condition. R2 evaluates IfNoneMatch atomically at commit.
+    """
+    try:
+        client.put_object(Bucket=bucket, Key=key, Body=content,
+                          ContentType=content_type, CacheControl=cache_control,
+                          IfNoneMatch='*')
+    except ClientError as error:
+        if error.response.get('ResponseMetadata', {}).get('HTTPStatusCode') == 412:
+            raise FileExistsError('Object key already exists; original preserved') from error
+        raise

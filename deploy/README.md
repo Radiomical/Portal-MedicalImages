@@ -75,3 +75,5 @@ the target PostgreSQL version before planning restore from PostgreSQL 18.
 The target project and buckets are owner-created. No actual migration is part of
 this configuration. Preserve the old database/media during a future approved
 cutover and rehearse a rollback that accounts for writes made after the switch.
+
+Object writes use atomic `PutObject(IfNoneMatch="*")` and fail on a key collision, including quarantine originals. They never overwrite or delete an existing object. Reconcile uncertain outcomes before retrying. This is create-only protection, not immutable retention against other credentials, lifecycle rules or dashboard changes. R2 support: https://developers.cloudflare.com/r2/api/s3/extensions/

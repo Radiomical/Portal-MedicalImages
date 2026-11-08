@@ -18,7 +18,7 @@ class StorageTests(SimpleTestCase):
         s.url('synthetic/cover.jpg')
         s.client.generate_presigned_url.assert_called_once_with('get_object', Params={'Bucket':'synthetic-images','Key':'synthetic/cover.jpg'}, ExpiresIn=300)
         s._save('synthetic/cover.jpg', ContentFile(b'synthetic'))
-        self.assertNotIn('ACL', s.client.upload_fileobj.call_args.kwargs['ExtraArgs'])
+        self.assertNotIn('ACL', s.client.put_object.call_args.kwargs)
 
     def test_dicom_and_traversal_cannot_be_signed_or_saved(self):
         for name in ['original.dcm', 'original.DCM', '../cover.jpg', '/cover.jpg', 'a//cover.jpg', 'a\\cover.jpg', 'cover.html']:
@@ -48,7 +48,7 @@ class StorageTests(SimpleTestCase):
         with patch('portal.storage.PrivateImageStorage', return_value=s):
             key = quarantine_dicom(ContentFile(b'synthetic'), 'synthetic/original.dcm')
         self.assertEqual(key, 'synthetic/original.dcm')
-        self.assertEqual(s.client.upload_fileobj.call_args.args[1], 'synthetic-originals')
+        self.assertEqual(s.client.put_object.call_args.kwargs['Bucket'], 'synthetic-originals')
         s.client.generate_presigned_url.assert_not_called()
 
     @override_settings(R2_ENDPOINT_URL='http://untrusted.invalid', R2_ACCESS_KEY_ID='synthetic', R2_SECRET_ACCESS_KEY='synthetic')
@@ -56,3 +56,26 @@ class StorageTests(SimpleTestCase):
         with patch('portal.storage.boto3.client') as client:
             with self.assertRaises(ImproperlyConfigured): PrivateImageStorage().client
             client.assert_not_called()
+
+    def test_writes_are_atomic_create_only(self):
+        s = self.storage()
+        s._save('synthetic/cover.jpg', ContentFile(b'synthetic'))
+        self.assertEqual(s.client.put_object.call_args.kwargs['IfNoneMatch'], '*')
+        with patch('portal.storage.PrivateImageStorage', return_value=s):
+            quarantine_dicom(ContentFile(b'synthetic'), 'synthetic/original.dcm')
+        self.assertEqual(s.client.put_object.call_args.kwargs['IfNoneMatch'], '*')
+
+    def test_collision_preserves_original_and_raises(self):
+        s = self.storage()
+        s.client.put_object.side_effect = ClientError({'Error': {'Code': 'PreconditionFailed'}, 'ResponseMetadata': {'HTTPStatusCode': 412}}, 'PutObject')
+        with self.assertRaises(FileExistsError):
+            s._save('synthetic/cover.jpg', ContentFile(b'synthetic'))
+        with patch('portal.storage.PrivateImageStorage', return_value=s):
+            with self.assertRaises(FileExistsError):
+                quarantine_dicom(ContentFile(b'synthetic'), 'synthetic/original.dcm')
+        self.assertEqual(s.client.put_object.call_count, 2)
+        s.client.delete_object.assert_not_called()
+
+    @override_settings(R2_ENDPOINT_URL='https://synthetic.r2.cloudflarestorage.com:443', R2_ACCESS_KEY_ID='synthetic', R2_SECRET_ACCESS_KEY='synthetic')
+    def test_noncanonical_endpoint_refused(self):
+        with self.assertRaises(ImproperlyConfigured): PrivateImageStorage().client
