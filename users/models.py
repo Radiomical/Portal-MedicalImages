@@ -98,3 +98,64 @@ class OriginalDicom(models.Model):
     sha256 = models.CharField(max_length=64)
     byte_size = models.PositiveBigIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Case(models.Model):
+    """Additive media extension. Post remains the case identity and URL source."""
+    post = models.OneToOneField(Post, primary_key=True, on_delete=models.CASCADE, related_name='media_case')
+    cover_key = models.CharField(max_length=255, blank=True)
+    legacy_metadata = models.JSONField(default=dict)
+    source_sha256 = models.CharField(max_length=64)
+    review_state = models.CharField(max_length=24, default='legacy_unverified', choices=[('legacy_unverified', 'Legacy unverified'), ('reviewed', 'Reviewed')])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(source_sha256__regex=r'^[0-9a-f]{64}$'), name='case_source_sha256_valid'),
+            models.CheckConstraint(condition=models.Q(review_state__in=['legacy_unverified', 'reviewed']), name='case_review_valid'),
+        ]
+
+
+class Series(models.Model):
+    PLANES = [('cover', 'Cover'), ('axial', 'Axial'), ('coronal', 'Coronal'), ('sagital', 'Sagittal')]
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='series')
+    plane = models.CharField(max_length=8, choices=PLANES)
+    description = models.CharField(max_length=500, blank=True)
+    order_basis = models.CharField(max_length=24, default='legacy_pk', choices=[('legacy_pk', 'Legacy PK'), ('explicit', 'Explicit position')])
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['case', 'plane'], name='series_case_plane_unique'),
+            models.CheckConstraint(condition=models.Q(plane__in=['cover', 'axial', 'coronal', 'sagital']), name='series_plane_valid'),
+            models.CheckConstraint(condition=models.Q(order_basis__in=['legacy_pk', 'explicit']), name='series_order_basis_valid'),
+        ]
+
+
+class Image(models.Model):
+    """Private display-object manifest. Metadata is not proof of anonymization."""
+    series = models.ForeignKey(Series, on_delete=models.CASCADE, related_name='images')
+    position = models.PositiveIntegerField()
+    object_key = models.CharField(max_length=255)
+    byte_size = models.PositiveBigIntegerField(null=True, blank=True)
+    sha256 = models.CharField(max_length=64, blank=True)
+    storage_location = models.CharField(max_length=16, default='legacy', choices=[('legacy', 'Legacy unverified'), ('filesystem', 'Filesystem'), ('r2', 'R2')])
+    verification_state = models.CharField(max_length=16, default='unverified', choices=[('unverified', 'Unverified'), ('verified', 'Verified'), ('missing', 'Missing')])
+    original = models.ForeignKey(OriginalDicom, null=True, blank=True, on_delete=models.PROTECT, related_name='derived_images')
+    conversion_version = models.CharField(max_length=64, blank=True)
+    review_state = models.CharField(max_length=16, default='pending', choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')])
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    # Scalar provenance survives replacement of legacy rows during staged edits.
+    legacy_file_id = models.PositiveBigIntegerField(null=True, blank=True)
+    legacy_description = models.CharField(max_length=500, null=True, blank=True)
+
+    class Meta:
+        ordering = ['position', 'pk']
+        constraints = [
+            models.UniqueConstraint(fields=['series', 'position'], name='image_series_position_unique'),
+            models.CheckConstraint(condition=~models.Q(object_key=''), name='image_key_nonempty'),
+            models.CheckConstraint(condition=models.Q(storage_location__in=['legacy', 'filesystem', 'r2']), name='image_storage_valid'),
+            models.CheckConstraint(condition=models.Q(verification_state__in=['unverified', 'verified', 'missing']), name='image_verification_valid'),
+            models.CheckConstraint(condition=models.Q(sha256='') | models.Q(sha256__regex=r'^[0-9a-f]{64}$'), name='image_sha256_valid'),
+            models.CheckConstraint(condition=~models.Q(verification_state='verified') | (models.Q(byte_size__gt=0) & ~models.Q(sha256='') & models.Q(byte_size__isnull=False)), name='image_verified_metadata'),
+            models.CheckConstraint(condition=models.Q(review_state__in=['pending', 'approved', 'rejected']), name='image_review_valid'),
+        ]
