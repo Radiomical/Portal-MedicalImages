@@ -20,8 +20,7 @@ python3.13 -m venv .venv
 ```
 
 Tests use synthetic accounts, an in-memory SQLite database and an in-memory mail
-backend. No production database or email service is contacted. A second CI job
-runs the same tests against an ephemeral PostgreSQL database. This does not prove
+backend. No production database or email service is contacted. CI also runs the same tests against an ephemeral PostgreSQL database. This does not prove
 compatibility with an existing deployed schema.
 
 ## Container
@@ -62,10 +61,10 @@ Supply configuration through the process environment or a private container
 | `SECURE_COOKIES` | True by default |
 | `SECURE_SSL_REDIRECT` | True by default |
 | `TRUST_PROXY_HTTPS` | False by default. Enable only behind a trusted proxy which replaces the forwarded-proto header |
-| `MAX_UPLOAD_FILES` | Request file-count limit, default 100. Additional size/content controls remain work in progress |
+| `MAX_UPLOAD_FILES` | Optional request file-count limit. Unset preserves inherited unlimited count; production upload limits still need workload validation |
 
 The published history contains no `users` migrations. Test settings synchronize
-that application's synthetic tables. Do not run `migrate --run-syncdb`, fake
+that application's synthetic tables; PostgreSQL tests synchronize all apps together to resolve foreign keys. Do not run `migrate --run-syncdb`, fake
 migrations or generate a production baseline against an existing database until
 the actual schema and migration history have been compared. Back up both database
 and media consistently, and rehearse restoration before any schema transition.

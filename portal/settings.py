@@ -69,7 +69,9 @@ EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@localhost")
 PASSWORD_RESET_TIMEOUT = 86400
 REST_FRAMEWORK = {"EXCEPTION_HANDLER": "api.helpers.utils.custom_exception_handler"}
-DATA_UPLOAD_MAX_NUMBER_FILES = int(os.environ.get("MAX_UPLOAD_FILES", "100"))
+# Preserve inherited series capacity until upload limits are validated with real workloads.
+MAX_UPLOAD_FILES = os.environ.get("MAX_UPLOAD_FILES")
+DATA_UPLOAD_MAX_NUMBER_FILES = int(MAX_UPLOAD_FILES) if MAX_UPLOAD_FILES else None
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 SESSION_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)
 CSRF_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)

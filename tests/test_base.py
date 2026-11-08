@@ -138,3 +138,10 @@ class SyntheticUploadTests(TestCase):
         self.assertTrue(Path(asset.header_image.path).is_relative_to(self.media.name))
         self.assertTrue(Path(asset.header_image.path).is_file())
         self.assertEqual(list(Path(self.media.name).rglob("*.dcm")), [])
+
+class UploadCompatibilityTests(SimpleTestCase):
+    def test_default_file_count_preserves_series_capacity(self):
+        import subprocess, sys
+        env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": "synthetic-process-only-test-key-0123456789", "MAX_UPLOAD_FILES": ""}
+        result = subprocess.run([sys.executable, "-c", "from django.conf import settings; assert settings.DATA_UPLOAD_MAX_NUMBER_FILES is None"], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
