@@ -56,3 +56,10 @@ class BoundedViewerTests(TestCase):
         first = self.endpoint(index=0).json()
         self.assertIn('slice-0.jpg', first['images'][0]['url'])
         self.assertEqual(self.endpoint(index=0).json()['images'][0]['url'], first['images'][0]['url'])
+
+    def test_legacy_literal_none_description_is_skipped(self):
+        rows = FilePost.objects.filter(post=self.post).order_by('pk')
+        rows.update(axial_description='None')
+        rows.filter(pk=rows.last().pk).update(axial_description='Synthetic valid description')
+        response = self.client.get(reverse('blog:blog_page', args=[self.post.title, self.post.pk]))
+        self.assertEqual(response.context['axial_description'], 'Synthetic valid description')

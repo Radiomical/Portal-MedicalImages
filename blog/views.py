@@ -54,7 +54,7 @@ def blog_page(request, blog_name, blog_id):
         field = plane + '_images'
         rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
         count = rows.count()
-        description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).values_list(plane + '_description', flat=True).first() or ''
+        description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).exclude(**{plane + '_description': 'None'}).values_list(plane + '_description', flat=True).first() or ''
         series[plane] = {'count': count, 'description': description}
     axial_description = series['axial']['description']
     coronal_description = series['coronal']['description']
