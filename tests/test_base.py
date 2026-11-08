@@ -166,3 +166,16 @@ class HistoricalChoiceTests(SimpleTestCase):
         historical = importlib.import_module("users.migrations.0037_userprofile")
         field = dict(historical.Migration.operations[0].fields)["country"]
         self.assertEqual(COUNTRY_CHOICES, list(field.choices))
+
+class PreviewRestrictionTests(SimpleTestCase):
+    def test_preview_blocks_writes_and_private_routes(self):
+        from django.test import RequestFactory
+        from django.http import HttpResponse
+        from portal.staging import ReadOnlyPreviewMiddleware
+        middleware = ReadOnlyPreviewMiddleware(lambda request: HttpResponse('Synthetic'))
+        factory = RequestFactory()
+        self.assertEqual(middleware(factory.get('/')).status_code, 200)
+        self.assertEqual(middleware(factory.post('/users/login/', {})).status_code, 403)
+        for path in ['/admin/', '/xxx/', '/api/get/posts/', '/users/signup/', '/users/profile/', '/users/reset-password/', '/users/activate/anything/']:
+            with self.subTest(path=path):
+                self.assertEqual(middleware(factory.get(path)).status_code, 404)
