@@ -34,6 +34,7 @@ def all_blogs(request):
 def blog_page(request, blog_name, blog_id):
     post = get_object_or_404(Post, id=blog_id)
     user_profile = UserProfile.objects.filter(user=post.author).first()
+    country = academic_year = work_location = medical_specialty = ''
     if user_profile is not None:
         country = user_profile.country
         academic_year = user_profile.academic_year
@@ -72,7 +73,6 @@ def blog_page(request, blog_name, blog_id):
     else:
         can_edit = False
 
-    print(axial_description)
 
     return render(request, 'blog/blog_page.html', {'blog_name': blog_name, 'post': post, 'axial_post_images_list': axial_post_images_list, 'coronal_post_images_list': coronal_post_images_list, 'sagital_post_images_list': sagital_post_images_list, 'can_edit': can_edit, 'filepost': filepost, 'country': country, 'academic_year': academic_year, 'work_location': work_location, 'medical_specialty': medical_specialty, 'axial_description': axial_description, 'coronal_description': coronal_description, 'sagital_description': sagital_description})
 

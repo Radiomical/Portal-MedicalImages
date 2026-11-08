@@ -226,10 +226,10 @@ def new_post(request):
                         new_image_header = Image.fromarray(image_header_array)
                         new_image_header = new_image_header.convert('L')
                         output_filename_header = header_image.name.split('.')[0] + '.jpg'
-                        output_path_image_header = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header)
+                        output_path_image_header = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header))
                         os.makedirs(os.path.dirname(output_path_image_header), exist_ok=True)
                         new_image_header.save(output_path_image_header, format='JPEG')
-                        output_path_image_header = output_path_image_header.replace('media/', '')
+                        output_path_image_header = os.path.relpath(output_path_image_header, settings.MEDIA_ROOT)
 
                         if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
                             FilePost.objects.create(post=post_instance, format=image_format, header_image=output_path_image_header, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
@@ -242,13 +242,13 @@ def new_post(request):
                                 img = Image.fromarray(image_array)
                                 img = img.convert('L')
                                 output_filename = image.name.split('.')[0] + '.jpg'
-                                output_path_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename)
+                                output_path_image = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename))
                                 os.makedirs(os.path.dirname(output_path_image), exist_ok=True)
                                 if accepted_data_use == 'Si':
-                                    output_path_dicom_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name)
+                                    output_path_dicom_image = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name))
                                     dicom_data.save_as(output_path_dicom_image)
                                 img.save(output_path_image, format='JPEG')
-                                output_path_image = output_path_image.replace('media/', '')
+                                output_path_image = os.path.relpath(output_path_image, settings.MEDIA_ROOT)
 
                                 if image_set is axial_images:
                                     FilePost.objects.create(axial_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, axial_description=axial_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)

@@ -1,8 +1,92 @@
-A social portal for medical images built on Django. It offers user creation, registration, and authentication options.
+# Portal Medical Images
 
-The most valuable aspect of the project is its presentation of medical images, primarily CT scans, which are automatically anonymized and displayed in a way similar to how they are used for medical diagnosis. 
-This is achieved through scrolling. In this case, this was implemented using JavaScript within the "blog" application.
+A Django portal for educational imaging cases and image-series browsing.
 
-You can check de results in https://portal.radiologymodels.com/
+## Development status
 
+The `next` line is an isolated refactor. It is not a production replacement yet.
+The application targets Python 3.13.17 and Django 6.1.3. Dependencies and hashes
+are locked in `requirements.txt`. The deployed schema and historical static
+assets must be inventoried before a deployment can be validated.
 
+## Local checks
+
+```sh
+python3.13 -m venv .venv
+.venv/bin/pip install --require-hashes -r requirements.txt
+.venv/bin/python manage.py check --settings=portal.settings_test
+.venv/bin/python manage.py test tests --settings=portal.settings_test --noinput
+./scripts/secret-scan.sh
+```
+
+Tests use synthetic accounts, an in-memory SQLite database and an in-memory mail
+backend. No production database or email service is contacted. A second CI job
+runs the same tests against an ephemeral PostgreSQL database. This does not prove
+compatibility with an existing deployed schema.
+
+## Container
+
+```sh
+docker build -t portal:0.1.0-dev .
+```
+
+The image runs as UID 10001 and starts Gunicorn on port 8081. Startup does not run
+migrations, import data or modify the production instance. Configure a separate
+database, media volume and environment for each staging instance. Restrict the
+host port to loopback when a local reverse proxy or tunnel is used.
+
+The image includes WhiteNoise for collected static assets. Recover the original
+CSS, JavaScript and branding into `static-src` before claiming visual parity.
+Collect assets into a dedicated `STATIC_ROOT` volume before starting the server.
+Patient images must never be copied into the source tree or container image.
+
+## Configuration
+
+Supply configuration through the process environment or a private container
+`--env-file`. Do not commit a filled environment file.
+
+| Variable | Purpose |
+| --- | --- |
+| `SECRET_KEY` | Required deployment secret, separate for isolated staging |
+| `DEBUG` | Explicit boolean, false by default |
+| `ALLOWED_HOSTS` | Comma-separated hostname allowlist |
+| `CSRF_TRUSTED_ORIGINS` | Comma-separated HTTPS origins |
+| `DB_ENGINE` | `postgresql` by default, `sqlite` only for isolated development |
+| `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD` | Separate PostgreSQL database credentials |
+| `DATABASE_HOST`, `DATABASE_PORT` | PostgreSQL connection, port 5432 by default |
+| `DATABASE_SSLMODE` | PostgreSQL TLS mode, `require` by default |
+| `MEDIA_ROOT`, `STATIC_ROOT` | Separate filesystem locations |
+| `EMAIL_BACKEND` | Console by default. Configure an approved backend for live mail |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings when using that backend |
+| `DEFAULT_FROM_EMAIL` | Deployment mail identity |
+| `SECURE_COOKIES` | True by default |
+| `SECURE_SSL_REDIRECT` | True by default |
+| `TRUST_PROXY_HTTPS` | False by default. Enable only behind a trusted proxy which replaces the forwarded-proto header |
+| `MAX_UPLOAD_FILES` | Request file-count limit, default 100. Additional size/content controls remain work in progress |
+
+The published history contains no `users` migrations. Test settings synchronize
+that application's synthetic tables. Do not run `migrate --run-syncdb`, fake
+migrations or generate a production baseline against an existing database until
+the actual schema and migration history have been compared. Back up both database
+and media consistently, and rehearse restoration before any schema transition.
+
+## Privacy boundary
+
+The inherited upload path can retain original DICOM files without applying a
+metadata anonymization policy. JPEG conversion alone does not remove identifying
+text burned into pixels. Existing behavior must not be treated as a guarantee of
+anonymization. Original DICOM access, image validation and research consent need
+separate verification before publication or reuse of real cases.
+
+## Changelog
+
+### 0.1.0 development
+
+- Upgrade the Python and Django runtime and lock dependencies with hashes.
+- Replace placeholder configuration with explicit environment settings.
+- Parse boolean flags without treating the text `False` as true.
+- Remove the obsolete Django six compatibility import.
+- Preserve HTTP 401 status in API error responses.
+- Handle case authors without a profile.
+- Make inherited DICOM conversion use the configured media directory.
+- Add synthetic regression tests, container definition and CI checks.
