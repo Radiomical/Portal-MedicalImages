@@ -61,3 +61,12 @@ class ReconciliationTests(TestCase):
         Image.objects.create(series=self.series,position=1,object_key=self.image.object_key,byte_size=7,sha256='b'*64,storage_location='filesystem')
         with patch('users.media_reconciliation.default_storage.open',return_value=io.BytesIO(self.raw)):
             self.assertEqual(audit_objects(1024,1024)['conflicting_baselines'],1)
+
+    def test_legacy_and_current_label_share_effective_backend_identity(self):
+        Image.objects.create(series=self.series,position=1,object_key=self.image.object_key,byte_size=7,sha256='b'*64,storage_location='legacy')
+        with patch('users.media_reconciliation.default_storage.open',return_value=io.BytesIO(self.raw)) as opened:
+            result=audit_objects(1024,1024)
+        self.assertEqual(opened.call_count,1)
+        self.assertEqual(result['duplicate_references'],1)
+        self.assertEqual(result['conflicting_baselines'],1)
+        self.assertEqual(result['bytes_read'],len(self.raw))

@@ -46,7 +46,8 @@ def audit_objects(byte_budget, max_object_bytes, include_originals=False):
     for kind, items in sources:
         for item in items:
             location = item.storage_location
-            identity = (kind, location, item.object_key)
+            effective_location = settings.MEDIA_STORAGE if kind == 'display' and location == 'legacy' else location
+            identity = (kind, effective_location, item.object_key)
             baseline = (item.byte_size, item.sha256)
             if identity in seen:
                 result['duplicate_references'] += 1
