@@ -113,3 +113,8 @@ English; stored case content and historical choice labels are preserved.
 Logout is POST-only with CSRF protection. The public synthetic preview continues
 to block writes and private/account routes. This interface change is not a
 production cutover and does not enable remote object storage.
+
+Synthetic browser checks also cover signup, new-post and edit-post: the upload
+warning opens and closes, DICOM toggles its consent block, consent toggles tagging,
+and the ICD-11 "Otras" option toggles its required free-text field. These scripts
+use native DOM APIs and do not depend on jQuery or the removed Webflow bundle.

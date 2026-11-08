@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 10
   web:
-    image: portal-medicalimages:0.1.0-alpha.3
+    image: portal-medicalimages:0.1.0-alpha.4
     build:
       context: ..
     restart: unless-stopped
