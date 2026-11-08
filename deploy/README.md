@@ -46,3 +46,34 @@ The setup override makes only this job's synthetic volumes writable. `run` does
 not publish the web service port by default. Do not repeat seed on an existing
 database; the command refuses rather than replacing any data. The web container
 uses the unmodified read-only staging definition after initialization.
+
+## Planned managed database and object storage transition
+
+The optional `MEDIA_STORAGE=r2` backend is preparation only. Keep filesystem
+storage enabled until resource ownership, EU jurisdiction, private-bucket status,
+CORS, credentials and a synthetic end-to-end test have been verified. Only the
+backend receives `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_IMAGE_BUCKET`, `R2_DICOM_BUCKET` and `R2_SIGNED_URL_SECONDS` (default 300).
+R2 URLs are short-lived bearer links using its S3 endpoint, not a custom domain.
+Do not log those URLs or put them into persistent database fields.
+
+The image backend signs only display-image keys. It does not authenticate a
+viewer: case-level permissions must be checked before rendering any image URL.
+The current public case pages remain public; private cases need a separate
+permission workflow. Signed URLs do not make a public page private. The planned
+viewer must renew expired URLs rather than saving them permanently.
+
+Original DICOM retention is an explicit, separate operation to a distinct private
+bucket. No URL or download route is provided for that bucket. Do not connect the
+legacy DICOM upload pipeline to R2 yet: it still uses local conversion paths and
+requires a storage-aware upload refactor, policy checks and synthetic integration
+tests. Raw originals remain quarantined until metadata and pixel review.
+
+For Supabase, retain Django authentication initially. Use a dedicated database
+role and TLS, restrict or disable the Data API for application tables, and verify
+the target PostgreSQL version before planning restore from PostgreSQL 18.
+The target project and buckets are owner-created. No actual migration is part of
+this configuration. Preserve the old database/media during a future approved
+cutover and rehearse a rollback that accounts for writes made after the switch.
+
+Object writes use atomic `PutObject(IfNoneMatch="*")` and fail on a key collision, including quarantine originals. They never overwrite or delete an existing object. Reconcile uncertain outcomes before retrying. This is create-only protection, not immutable retention against other credentials, lifecycle rules or dashboard changes. R2 support: https://developers.cloudflare.com/r2/api/s3/extensions/
