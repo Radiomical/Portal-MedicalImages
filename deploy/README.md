@@ -30,3 +30,19 @@ To roll back the Docker installation itself, after stopping this project's
 containers, remove docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin
 and docker-compose-plugin, then remove the Docker apt source and key. Do not
 remove other services, data directories or firewall rules indiscriminately.
+
+## Explicit initialization
+
+After exporting `PORTAL_STAGING_ENV_FILE`:
+
+```sh
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml build web
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml up -d db
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml -f deploy/compose.setup.yml run --rm --no-deps web sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py seed_preview'
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml up -d web
+```
+
+The setup override makes only this job's synthetic volumes writable. `run` does
+not publish the web service port by default. Do not repeat seed on an existing
+database; the command refuses rather than replacing any data. The web container
+uses the unmodified read-only staging definition after initialization.
