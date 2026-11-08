@@ -158,3 +158,11 @@ class RecoveredBaselineTests(SimpleTestCase):
         from users.forms import UserUpdateForm
         self.assertIn(("Turkey", "Turkey"), COUNTRY_CHOICES)
         self.assertIn(("Turkey", "Turkey"), UserUpdateForm().fields["user_country"].choices)
+
+class HistoricalChoiceTests(SimpleTestCase):
+    def test_country_snapshot_matches_migration(self):
+        import importlib
+        from users.countries import COUNTRY_CHOICES
+        historical = importlib.import_module("users.migrations.0037_userprofile")
+        field = dict(historical.Migration.operations[0].fields)["country"]
+        self.assertEqual(COUNTRY_CHOICES, list(field.choices))

@@ -1,4 +1,4 @@
-import pycountry
+from .countries import COUNTRY_CHOICES
 from django.db import models
 from blog.models import Post
 from django.contrib.auth.models import User
@@ -7,9 +7,6 @@ from django.db.models.fields import BLANK_CHOICE_DASH
 
 def images_path(instance, filename):
     return 'images/user_{0}/post_{1}/{2}'.format(instance.post.author.username, instance.post.id, filename)
-
-# Keep stored country labels stable across pycountry updates.
-COUNTRY_CHOICES = [("Turkey" if c.alpha_2 == "TR" else c.name,) * 2 for c in pycountry.countries]
 
 class UserProfile(models.Model):
     academic_year_list = ['Estudiante','R0', 'R1', 'R2','R3', 'R4','R5', 'Adjunto']

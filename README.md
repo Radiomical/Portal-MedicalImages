@@ -67,6 +67,15 @@ The historical `users` migration chain (0001 through 0042) and application stati
 assets have been recovered from the deployed source checkout. Tests now apply the
 real migration chain to empty, isolated databases rather than synchronizing
 synthetic tables. Do not fake migrations or apply a production baseline blindly.
+The historical chain contains placeholder file-path defaults (including `test`,
+`totsubl` and `totusbl`). Never replay these old steps against populated tables
+without checking migration records and affected rows. Restore a consistent
+database backup with its migration records for staging; do not import application
+rows into an empty or partially migrated schema and then replay the old chain.
+
+Country labels are a fixed snapshot matching the historical migration, independent
+of pycountry releases. Changing stored labels requires an explicit compatibility plan.
+
 Compare the actual schema and migration records first, back up database and media
 consistently, and rehearse restoration before any schema transition.
 
