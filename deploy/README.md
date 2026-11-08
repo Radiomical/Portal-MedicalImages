@@ -38,7 +38,9 @@ After exporting `PORTAL_STAGING_ENV_FILE`:
 ```sh
 docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml build web
 docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml up -d db
-docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml -f deploy/compose.setup.yml run --rm --no-deps web sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py seed_preview'
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml -f deploy/compose.setup.yml run --rm --no-deps web manage.py migrate --noinput
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml -f deploy/compose.setup.yml run --rm --no-deps web manage.py collectstatic --noinput
+docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml -f deploy/compose.setup.yml run --rm --no-deps web manage.py seed_preview
 docker compose --env-file "$PORTAL_STAGING_ENV_FILE" -f deploy/compose.staging.yml up -d web
 ```
 
@@ -108,3 +110,34 @@ configure `MAX_IMAGE_UPLOAD_BYTES`, `MAX_CASE_UPLOAD_BYTES`, `MAX_IMAGE_PIXELS`.
 Production activation needs capacity testing and an agreed upload policy.
 For Supabase, set `DATABASE_SSLMODE=verify-full` and `DATABASE_SSLROOTCERT` to the
 owner-supplied CA path. Verify both client-to-pooler and pooler-to-database TLS.
+
+## Audited runtime artifact
+
+A successful push build on `next` exports the exact runtime that passed the
+container tests and Trivy gate. The `audited-runtime-<full-commit>` artifact
+contains `runtime.tar.gz`, `image-inspect.json` and `SHA256SUMS`; retention is two
+days. It contains application code and dependencies, never production data or
+secrets. The image uses an explicit `portal-medicalimages:next-<full-commit>` tag.
+This is an audit/deployment input, not permission to deploy.
+
+Before use, verify that both workflow jobs succeeded for the selected commit,
+check the artifact checksums, load the archive, and compare the loaded image ID
+with `image-inspect.json`. Deploy by that verified image ID. Do not rebuild on a
+small production host and assume it is the image that CI audited. Trivy's full
+report remains in the separate `image-audit` artifact; its residual findings must
+be read, not hidden by the gate. The gate rejects fixable HIGH/CRITICAL findings,
+not all unfixed findings.
+
+The distroless image has a Python entrypoint, no shell or pip. A command such as
+`docker run IMAGE manage.py check` runs Python; `sh -c ...` cannot work. Run each
+initialization job separately. Startup does not run migrations or collect static
+assets. Build/import alone does not change the running preview or production.
+
+The current production migration target retains the existing Azure PostgreSQL
+database and uses private R2 display-image and original-DICOM buckets. Supabase
+preparation is paused, with existing resources retained. The older Supabase notes
+above are planning history, not the current cutover target. A production cutover
+still requires a verified backup, a tested rollback that accounts for new writes,
+full reference/hash reconciliation and real runtime/browser checks. Existing
+anonymous case/JPEG access is inherited behavior. Original DICOM stays private;
+its integrity does not establish anonymity or permission to publish it.

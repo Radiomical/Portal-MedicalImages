@@ -28,6 +28,7 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements.txt
       - run: pip install pip-audit==2.10.1
       - run: pip-audit -r requirements.txt
+      - run: python scripts/test-runtime-artifact.py
       - run: python manage.py check --settings=portal.settings_test
       - run: python manage.py test tests --settings=portal.settings_test --noinput
       - run: python manage.py test tests --settings=portal.settings_ci_postgres --noinput
@@ -55,6 +56,25 @@ jobs:
           name: image-audit
           path: image-audit/
           retention-days: 14
+      - name: Export the exact audited runtime on next
+        shell: bash
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-artifact
+          image="portal-medicalimages:next-${GITHUB_SHA}"
+          docker tag portal:0.1.0-distroless-ci "$image"
+          docker image inspect "$image" > runtime-artifact/image-inspect.json
+          docker save "$image" | gzip -1 > runtime-artifact/runtime.tar.gz
+          gzip -t runtime-artifact/runtime.tar.gz
+          tar -tzf runtime-artifact/runtime.tar.gz > /dev/null
+          (cd runtime-artifact && sha256sum runtime.tar.gz image-inspect.json > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        with:
+          name: audited-runtime-${{ github.sha }}
+          path: runtime-artifact/
+          retention-days: 2
   secrets:
     runs-on: ubuntu-latest
     steps:
