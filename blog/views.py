@@ -12,7 +12,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from users.models import FilePost
+from users.media_reader import normalized_case
+from users.models import Case, FilePost
 from .models import Post
 from users.models import UserProfile
 from users.forms import PostForm, FilePostForm
@@ -52,12 +53,20 @@ def blog_page(request, blog_name, blog_id):
     filepost = FilePost.objects.filter(post=post).first()
     # Only counts and descriptions enter the page, never an entire signed stack.
     series = {}
-    for plane in ('axial', 'coronal', 'sagital'):
-        field = plane + '_images'
-        rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
-        count = rows.count()
-        description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).exclude(**{plane + '_description': 'None'}).values_list(plane + '_description', flat=True).first() or ''
-        series[plane] = {'count': count, 'description': description}
+    normalized = normalized_case(post.pk)
+    if normalized is not None:
+        from django.db.models import Count
+        details = {row['plane']: row for row in normalized.series.annotate(image_count=Count('images')).values('plane', 'description', 'image_count')}
+        for plane in ('axial', 'coronal', 'sagital'):
+            row = details.get(plane, {})
+            series[plane] = {'count': row.get('image_count', 0), 'description': row.get('description', '')}
+    else:
+        for plane in ('axial', 'coronal', 'sagital'):
+            field = plane + '_images'
+            rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
+            count = rows.count()
+            description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).exclude(**{plane + '_description': 'None'}).values_list(plane + '_description', flat=True).first() or ''
+            series[plane] = {'count': count, 'description': description}
     axial_description = series['axial']['description']
     coronal_description = series['coronal']['description']
     sagital_description = series['sagital']['description']
@@ -77,6 +86,10 @@ def blog_page(request, blog_name, blog_id):
 def case_cards():
     """One cover subquery and author join, not one media query per card."""
     cover = FilePost.objects.filter(post_id=OuterRef('pk')).order_by('pk').values('header_image')[:1]
+    if settings.CASE_MEDIA_NORMALIZED_READ:
+        from django.db.models import Case as WhenCase, When, F, CharField
+        return Post.objects.select_related('author').annotate(
+            cover_key=WhenCase(When(media_case__projection_stale=False, then=F('media_case__cover_key')), default=Subquery(cover), output_field=CharField()))
     return Post.objects.select_related('author').annotate(cover_key=Subquery(cover))
 
 
@@ -99,12 +112,24 @@ def series_slice(request, blog_id, plane):
         index = int(request.GET.get('index', '0'))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid slice index.'}, status=400)
-    field = plane + '_images'
-    rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
-    total = rows.count()
-    if index < 0 or index >= total:
-        raise Http404
-    keys = list(rows.values_list(field, flat=True)[index:index + 2])
+    normalized = normalized_case(post.pk)
+    if normalized is not None:
+        from users.models import Image
+        rows = Image.objects.filter(series__case=normalized, series__plane=plane)
+        total = rows.count()
+        if index < 0 or index >= total:
+            raise Http404
+        keys = list(rows.filter(position__gte=index, position__lt=index + 2).order_by('position').values_list('object_key', flat=True))
+        if len(keys) != min(2, total - index):
+            # A projection with gaps is corrupt, not permission to shift slices.
+            return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
+    else:
+        field = plane + '_images'
+        rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
+        total = rows.count()
+        if index < 0 or index >= total:
+            raise Http404
+        keys = list(rows.values_list(field, flat=True)[index:index + 2])
     from django.conf import settings
     ttl = settings.R2_SIGNED_URL_SECONDS if settings.MEDIA_STORAGE == 'r2' else 300
     return JsonResponse({'index': index, 'total': total, 'ttl': ttl,

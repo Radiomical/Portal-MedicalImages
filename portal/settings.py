@@ -107,3 +107,7 @@ if DATABASE_SSLROOTCERT and DATABASES['default']['ENGINE'] == 'django.db.backend
 
 # Staged manifest dual-write only. Legacy reads remain active.
 CASE_MEDIA_DUAL_WRITE = env_bool('CASE_MEDIA_DUAL_WRITE', False)
+
+CASE_MEDIA_NORMALIZED_READ = env_bool('CASE_MEDIA_NORMALIZED_READ', False)
+if CASE_MEDIA_NORMALIZED_READ and not CASE_MEDIA_DUAL_WRITE:
+    raise ImproperlyConfigured('Normalized media reads require canonical dual-write enabled.')

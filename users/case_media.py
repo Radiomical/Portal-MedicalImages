@@ -36,7 +36,7 @@ def projection(post):
         if result:
             images[plane] = result
             descriptions[plane] = next((item['legacy_description'] for item in result if item['legacy_description'] not in (None, '', 'None')), '')
-    return {'fingerprint': fingerprint, 'metadata': metadata, 'cover_key': metadata['cover_keys'][0] if metadata['cover_keys'] else '', 'images': images, 'descriptions': descriptions}
+    return {'fingerprint': fingerprint, 'metadata': metadata, 'cover_key': (rows[0]['header_image'] or '') if rows else '', 'images': images, 'descriptions': descriptions}
 
 
 def verify_case(case, plan):
