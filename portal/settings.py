@@ -94,3 +94,13 @@ if MEDIA_STORAGE == 'r2':
     }
 elif MEDIA_STORAGE != 'filesystem':
     raise ImproperlyConfigured('MEDIA_STORAGE must be filesystem or r2')
+
+# Explicit upload bounds. No original DICOM is retained without opting in.
+MAX_IMAGE_UPLOAD_BYTES = int(os.environ.get('MAX_IMAGE_UPLOAD_BYTES', str(32 * 1024 * 1024)))
+MAX_CASE_UPLOAD_BYTES = int(os.environ.get('MAX_CASE_UPLOAD_BYTES', str(256 * 1024 * 1024)))
+MAX_IMAGE_PIXELS = int(os.environ.get('MAX_IMAGE_PIXELS', '40000000'))
+DICOM_RETENTION_ENABLED = env_bool('DICOM_RETENTION_ENABLED', False)
+PRIVATE_DICOM_ROOT = Path(os.environ.get('PRIVATE_DICOM_ROOT', str(BASE_DIR / '.local' / 'private-dicom')))
+DATABASE_SSLROOTCERT = os.environ.get('DATABASE_SSLROOTCERT', '')
+if DATABASE_SSLROOTCERT and DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    DATABASES['default']['OPTIONS']['sslrootcert'] = DATABASE_SSLROOTCERT

@@ -1,6 +1,6 @@
-import pydicom
+from django.core.exceptions import ValidationError
+from users.uploads import prepare_images, store_case_images
 import os
-from PIL import Image
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -186,97 +186,21 @@ def new_post(request):
             header_image = request.FILES.get('header_image')
 
             if form.is_valid() and form2.is_valid():
-                title = form.cleaned_data['title']
-                content = form.cleaned_data['content']
-                category = form.cleaned_data['category']
-                image_format = form2.cleaned_data['format']
-                fisiopathology = form.cleaned_data['fisiopathology']
-                clinical_case = form.cleaned_data['clinical_case']
-                clinical_signs = form.cleaned_data['clinical_signs']
-                doppler = form.cleaned_data['doppler']
-                sequential = form.cleaned_data['sequential']
-                preparation = form.cleaned_data['preparation']
-                pediatrics = form.cleaned_data['pediatrics']
-                medical_report = form.cleaned_data['medical_report']
-                seram_link = form.cleaned_data['seram_link']
-                radiopedia_link = form.cleaned_data['radiopedia_link']
-                accepted_data_use = form2.cleaned_data['accepted_data_use']
-                cie_11_tagging = form2.cleaned_data['cie_11_tagging']
-                interested_region = form2.cleaned_data['interested_region']
-                other_interested_region = form2.cleaned_data['other_interested_region']
-                axial_description = form2.cleaned_data['axial_description']
-                coronal_description = form2.cleaned_data['coronal_description']
-                sagital_description = form2.cleaned_data['sagital_description']
-                error = False
-
-                if accepted_data_use == 'No':
-                    cie_11_tagging = None
-                    interested_region = None
-                    other_interested_region = None
-
-                post_instance = Post.objects.create(title=title, content=content, category=category, author=request.user, fisiopathology=fisiopathology, clinical_case=clinical_case, clinical_signs=clinical_signs, doppler=doppler, preparation=preparation, pediatrics=pediatrics, medical_report=medical_report, seram_link=seram_link, radiopedia_link=radiopedia_link)
-
-                if image_format == 'DICOM':
-                    try:
-                        image_header_dicom = pydicom.dcmread(header_image)
-                        image_header_array = image_header_dicom.pixel_array.astype(float)
-                        new_image_header = Image.fromarray(image_header_array)
-                        new_image_header = new_image_header.convert('L')
-                        output_filename_header = header_image.name.split('.')[0] + '.jpg'
-                        output_path_image_header = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header))
-                        os.makedirs(os.path.dirname(output_path_image_header), exist_ok=True)
-                        new_image_header.save(output_path_image_header, format='JPEG')
-                        output_path_image_header = os.path.relpath(output_path_image_header, settings.MEDIA_ROOT)
-
-                        if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                            FilePost.objects.create(post=post_instance, format=image_format, header_image=output_path_image_header, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-
-
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                dicom_data = pydicom.dcmread(image)
-                                image_array = dicom_data.pixel_array.astype(float)
-                                img = Image.fromarray(image_array)
-                                img = img.convert('L')
-                                output_filename = image.name.split('.')[0] + '.jpg'
-                                output_path_image = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename))
-                                os.makedirs(os.path.dirname(output_path_image), exist_ok=True)
-                                if accepted_data_use == 'Si':
-                                    output_path_dicom_image = os.path.join(settings.MEDIA_ROOT, 'images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name))
-                                    dicom_data.save_as(output_path_dicom_image)
-                                img.save(output_path_image, format='JPEG')
-                                output_path_image = os.path.relpath(output_path_image, settings.MEDIA_ROOT)
-
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, axial_description=axial_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, sagital_description=sagital_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                else:
-                                    FilePost.objects.create(coronal_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, coronal_description=coronal_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                    except:
-                        error = True
-
-                else:
-                    if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                        FilePost.objects.create(post=post_instance, format=image_format, header_image=header_image)
-                    try:
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=image, post=post_instance, format=image_format, header_image=header_image, axial_description=axial_description)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=image, post=post_instance, format=image_format, header_image=header_image, sagital_description=sagital_description)
-                                else:
-                                    FilePost.objects.create(coronal_images=image, post=post_instance, format=image_format, header_image=header_image, coronal_description=coronal_description)
-                    except:
-                        error = True
-
-                if not error:
-                    message = 'Entrada creada correctamente.'
-                else:
-                    message = 'Error al crear la entrada. Por favor intenta de nuevo.'
-
-                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': message, 'error': error})
+                try:
+                    prepared = prepare_images(form2.cleaned_data, {
+                        'header_image': [header_image], 'axial_images': axial_images,
+                        'coronal_images': coronal_images, 'sagital_images': sagital_images})
+                    with transaction.atomic():
+                        post_instance = form.save(commit=False)
+                        post_instance.author = request.user
+                        post_instance.save()
+                        store_case_images(post_instance, form2.cleaned_data, prepared)
+                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Case created.', 'error': False})
+                except ValidationError as error:
+                    form2.add_error(None, error)
+                except Exception:
+                    form2.add_error(None, 'Storage failed. No case was saved. Contact the administrator before retrying.')
+                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No case was saved.', 'error': True})
             else:
                 content = request.POST.get('content')
                 title = request.POST.get('title')

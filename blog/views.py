@@ -1,6 +1,7 @@
-import pydicom
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from users.uploads import prepare_images, store_case_images
 import os
-from PIL import Image
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -119,88 +120,21 @@ def edit_blog(request, blog_id):
             header_image = request.FILES.get('header_image')
 
             if form.is_valid() and form2.is_valid():
-                form.save()
-                post_instance = Post.objects.get(id=blog_id)
-                file_instance = FilePost.objects.filter(post=post_instance)
-                file_instance.all().delete()
-                image_format = form2.cleaned_data['format']
-                accepted_data_use = form2.cleaned_data['accepted_data_use']
-                cie_11_tagging = form2.cleaned_data['cie_11_tagging']
-                interested_region = form2.cleaned_data['interested_region']
-                other_interested_region = form2.cleaned_data['other_interested_region']
-                axial_description = form2.cleaned_data['axial_description']
-                coronal_description = form2.cleaned_data['coronal_description']
-                sagital_description = form2.cleaned_data['sagital_description']
-                error = False
-
-                if accepted_data_use == 'No':
-                    cie_11_tagging = None
-                    interested_region = None
-                    other_interested_region = None
-
-                if image_format == 'DICOM':
-                    try:
-                        image_header_dicom = pydicom.dcmread(header_image)
-                        image_header_array = image_header_dicom.pixel_array.astype(float)
-                        new_image_header = Image.fromarray(image_header_array)
-                        new_image_header = new_image_header.convert('L')
-                        output_filename_header = header_image.name.split('.')[0] + '.jpg'
-                        output_path_image_header = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header)
-                        os.makedirs(os.path.dirname(output_path_image_header), exist_ok=True)
-                        new_image_header.save(output_path_image_header, format='JPEG')
-                        output_path_image_header = output_path_image_header.replace('media/', '')
-
-                        if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                            FilePost.objects.create(post=post_instance, format=image_format, header_image=output_path_image_header, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-
-
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                dicom_data = pydicom.dcmread(image)
-                                image_array = dicom_data.pixel_array.astype(float)
-                                img = Image.fromarray(image_array)
-                                img = img.convert('L')
-                                output_filename = image.name.split('.')[0] + '.jpg'
-                                output_path_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename)
-                                os.makedirs(os.path.dirname(output_path_image), exist_ok=True)
-                                if accepted_data_use == 'Si':
-                                    output_path_dicom_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name)
-                                    dicom_data.save_as(output_path_dicom_image)
-                                img.save(output_path_image, format='JPEG')
-                                output_path_image = output_path_image.replace('media/', '')
-
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, axial_description=axial_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, sagital_description=sagital_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                else:
-                                    FilePost.objects.create(coronal_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, coronal_description=coronal_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                    except:
-                        error = True
-
-                else:
-                    if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                        FilePost.objects.create(post=post_instance, format=image_format, header_image=header_image)
-                    try:
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=image, post=post_instance, format=image_format, header_image=header_image, axial_description=axial_description)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=image, post=post_instance, format=image_format, header_image=header_image, sagital_description=sagital_description)
-                                else:
-                                    FilePost.objects.create(coronal_images=image, post=post_instance, format=image_format, header_image=header_image, coronal_description=coronal_description)
-                    except:
-                        error = True
-
-                if not error:
-                    post = get_object_or_404(Post, id=blog_id)
-                    return redirect('blog:blog_page', blog_name=post.title, blog_id=blog_id)
-
-                else:
-                    message = 'Error al editar la entrada. Por favor intenta de nuevo.'
-                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': message, 'error': error})
-
+                try:
+                    prepared = prepare_images(form2.cleaned_data, {
+                        'header_image': [header_image], 'axial_images': axial_images,
+                        'coronal_images': coronal_images, 'sagital_images': sagital_images})
+                    with transaction.atomic():
+                        post_instance = form.save()
+                        previous_ids = list(FilePost.objects.filter(post=post_instance).values_list('pk', flat=True))
+                        store_case_images(post_instance, form2.cleaned_data, prepared)
+                        FilePost.objects.filter(pk__in=previous_ids).delete()
+                    return redirect('blog:blog_page', blog_name=post_instance.title, blog_id=post_instance.pk)
+                except ValidationError as error:
+                    form2.add_error(None, error)
+                except Exception:
+                    form2.add_error(None, 'Storage failed. Case changes were not saved. Contact the administrator before retrying.')
+                return render(request, 'blog/edit_blog_page.html', {'form': form, 'form2': form2, 'post': post, 'post_id': post.pk, 'editing': True, 'error': True, 'message': 'Case changes were not saved.'})
 
             else:
                 content = request.POST.get('content')
