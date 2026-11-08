@@ -88,3 +88,13 @@ class FilePost(models.Model):
     cie_11_tagging = models.CharField(max_length=100, choices=CIE_11_TAGGING_CHOICES, blank=True, null=True)
     interested_region = models.CharField(max_length=100, choices=INTERESTED_REGION_CHOICES, blank=True, null=True)
     other_interested_region = models.CharField(max_length=100, blank=True, null=True)
+
+
+class OriginalDicom(models.Model):
+    """Private retention manifest only. No URL, public field or filename."""
+    post = models.ForeignKey(Post, on_delete=models.PROTECT, related_name='retained_originals')
+    object_key = models.CharField(max_length=255, unique=True)
+    storage_location = models.CharField(max_length=16, choices=[('r2', 'R2'), ('filesystem', 'Private filesystem')])
+    sha256 = models.CharField(max_length=64)
+    byte_size = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)

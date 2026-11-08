@@ -77,3 +77,34 @@ this configuration. Preserve the old database/media during a future approved
 cutover and rehearse a rollback that accounts for writes made after the switch.
 
 Object writes use atomic `PutObject(IfNoneMatch="*")` and fail on a key collision, including quarantine originals. They never overwrite or delete an existing object. Reconcile uncertain outcomes before retrying. This is create-only protection, not immutable retention against other credentials, lifecycle rules or dashboard changes. R2 support: https://developers.cloudflare.com/r2/api/s3/extensions/
+
+## Storage-aware uploads and original retention
+
+New upload keys use random UUIDs, not usernames or source filenames. The service
+pre-decodes the whole submission before saving a case. JPEGs are re-encoded (EXIF
+is not carried over); DICOM is limited to single-frame grayscale and retains the
+inherited educational grayscale conversion. This is not diagnostic windowing or
+an anonymization guarantee. Text burned into pixels still needs review.
+
+Both create and edit use the same storage API and a database transaction. Failed
+edits keep existing case fields and image references. External object writes are
+not transactional: an uncertain or partial failure may leave unreferenced new
+objects, which must be reconciled by manifest and hash, not blindly deleted or
+retried. Existing objects are never overwritten or automatically deleted.
+
+Original retention requires `DICOM_RETENTION_ENABLED=true`; a submission asking
+to retain originals fails explicitly when disabled. It never silently drops an
+original requested for retention. With R2, originals use the separate quarantine
+bucket with no URL generation. Without R2, originals go to `PRIVATE_DICOM_ROOT`
+(default `.local/private-dicom`) with restrictive permissions, outside public
+`MEDIA_ROOT`. Never expose that directory through a web server. A database-only
+`OriginalDicom` manifest records the private key, SHA256 and byte size. No original
+filename is stored. Cases with retained originals cannot be deleted until an
+explicit retention workflow deals with them. Existing local DICOM is not moved by
+this change. Retention is not enabled in public staging.
+
+Upload bounds default to 32 MiB/file, 256 MiB/case and 40 million pixels/image;
+configure `MAX_IMAGE_UPLOAD_BYTES`, `MAX_CASE_UPLOAD_BYTES`, `MAX_IMAGE_PIXELS`.
+Production activation needs capacity testing and an agreed upload policy.
+For Supabase, set `DATABASE_SSLMODE=verify-full` and `DATABASE_SSLROOTCERT` to the
+owner-supplied CA path. Verify both client-to-pooler and pooler-to-database TLS.
