@@ -1,4 +1,4 @@
-import pycountry
+from .countries import COUNTRY_CHOICES
 from django.db import models
 from blog.models import Post
 from django.contrib.auth.models import User
@@ -13,7 +13,7 @@ class UserProfile(models.Model):
     medical_specialty_list = ['Radiología pediátrica', 'Radiología ginecológica','Radiología de abdomen', 'Neurorradiología', 'Radiología intervencionista', 'Radiología musculoesquelética', 'Radiología general']
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    country = models.CharField(max_length=100, choices=[(country.name, country.name) for country in pycountry.countries], blank=True, null=True)
+    country = models.CharField(max_length=100, choices=COUNTRY_CHOICES, blank=True, null=True)
     academic_year = models.CharField(max_length=100, choices=[(academic_year, academic_year) for academic_year in academic_year_list], blank=True, null=True)
     work_location = models.CharField(max_length=100, blank=True, null=True)
     medical_specialty = models.CharField(max_length=100, choices=[(medical_specialty, medical_specialty) for medical_specialty in medical_specialty_list], blank=True, null=True)

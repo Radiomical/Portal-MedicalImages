@@ -6,8 +6,8 @@ A Django portal for educational imaging cases and image-series browsing.
 
 The `next` line is an isolated refactor. It is not a production replacement yet.
 The application targets Python 3.13.17 and Django 6.1.3. Dependencies and hashes
-are locked in `requirements.txt`. The deployed schema and historical static
-assets must be inventoried before a deployment can be validated.
+are locked in `requirements.txt`. Deployment still requires an isolated staging environment and a database/media
+backup and restore rehearsal.
 
 ## Local checks
 
@@ -63,11 +63,21 @@ Supply configuration through the process environment or a private container
 | `TRUST_PROXY_HTTPS` | False by default. Enable only behind a trusted proxy which replaces the forwarded-proto header |
 | `MAX_UPLOAD_FILES` | Optional request file-count limit. Unset preserves inherited unlimited count; production upload limits still need workload validation |
 
-The published history contains no `users` migrations. Test settings synchronize
-that application's synthetic tables; PostgreSQL tests synchronize all apps together to resolve foreign keys. Do not run `migrate --run-syncdb`, fake
-migrations or generate a production baseline against an existing database until
-the actual schema and migration history have been compared. Back up both database
-and media consistently, and rehearse restoration before any schema transition.
+The historical `users` migration chain (0001 through 0042) and application static
+assets have been recovered from the deployed source checkout. Tests now apply the
+real migration chain to empty, isolated databases rather than synchronizing
+synthetic tables. Do not fake migrations or apply a production baseline blindly.
+The historical chain contains placeholder file-path defaults (including `test`,
+`totsubl` and `totusbl`). Never replay these old steps against populated tables
+without checking migration records and affected rows. Restore a consistent
+database backup with its migration records for staging; do not import application
+rows into an empty or partially migrated schema and then replay the old chain.
+
+Country labels are a fixed snapshot matching the historical migration, independent
+of pycountry releases. Changing stored labels requires an explicit compatibility plan.
+
+Compare the actual schema and migration records first, back up database and media
+consistently, and rehearse restoration before any schema transition.
 
 ## Privacy boundary
 
