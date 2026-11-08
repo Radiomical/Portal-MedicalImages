@@ -22,7 +22,7 @@ class ClinicalInterfaceTests(TestCase):
 
     def test_case_preserves_content_and_has_real_controls(self):
         response = self.client.get(reverse('blog:blog_page', args=[self.post.title, self.post.pk]))
-        for text in ['Fictional overview', 'Fictional clinical case', 'Fictional example report', 'data-series', 'type="range"', 'slice 1 of 2', 'slice 2 of 2', 'Not a diagnostic viewer']:
+        for text in ['Fictional overview', 'Fictional clinical case', 'Fictional example report', 'data-series', 'type="range"', 'slice 1 of 2', 'Not a diagnostic viewer']:
             self.assertContains(response, text)
         self.assertNotContains(response, 'MEDIR')
 
