@@ -18,52 +18,52 @@
                                     <div class="w-form {{ css_class }}">
                                         {% for field in fields %}
                                             {% if field.name == 'content' %}
-                                                <label for="{{field.name}}">Contenido del post: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}" required>{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Contenido del post: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}" required>{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'category' %}
-                                            <label for="{{field.name}}">Categoría del post: </label>
+                                            <label for="{{field.id_for_label}}">Categoría del post: </label>
                                                 <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="w-select">
                                                     {% for choice in field.field.choices %}
                                                         <option value="{{ choice.0 }}" {% if choice.0 == field.value %}selected{% endif %}>{{ choice.1 }}</option>
                                                     {% endfor %}
                                                 </select>
                                             {% elif field.name == 'fisiopathology' %}
-                                                <label for="{{field.name}}">Fisiopatología: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Fisiopatología: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'clinical_case' %}
-                                                <label for="{{field.name}}">Clínica: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Clínica: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'clinical_signs' %}
-                                                <label for="{{field.name}}">Signos: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Signos: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'doppler' %}
-                                                <label for="{{field.name}}">Doppler: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Doppler: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'medical_findings' %}
-                                                <label for="{{field.name}}">Seguridad en la descripción de los hallazgos radiológicos: </label>
+                                                <label for="{{field.id_for_label}}">Seguridad en la descripción de los hallazgos radiológicos: </label>
                                                     <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="w-select">
                                                         {% for choice in field.field.choices %}
                                                             <option value="{{ choice.0 }}" {% if choice.0 == field.value %}selected{% endif %}>{{ choice.1 }}</option>
                                                         {% endfor %}
                                                     </select>
                                             {% elif field.name == 'preparation' %}
-                                                <label for="{{field.name}}">Preparación: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Preparación: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'sequential' %}
-                                                <label for="{{field.name}}">Consecutivas: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Consecutivas: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'pediatrics' %}
-                                                <label for="{{field.name}}">Pediatría: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Pediatría: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'medical_report' %}
-                                                <label for="{{field.name}}">Informe tipo de esta patología: </label>
-                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
+                                                <label for="{{field.id_for_label}}">Informe tipo de esta patología: </label>
+                                                <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'seram_link' %}
-                                                <label for="{{field.name}}">Enlace SERAM: </label>
-                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{field.value|default_if_none:''}}">
+                                                <label for="{{field.id_for_label}}">Enlace SERAM: </label>
+                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.id_for_label}}" value="{{field.value|default_if_none:''}}">
                                             {% elif field.name == 'radiopedia_link' %}
-                                                <label for="{{field.name}}">Enlace Radiopaedia: </label>
-                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{field.value|default_if_none:''}}">
+                                                <label for="{{field.id_for_label}}">Enlace Radiopaedia: </label>
+                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.id_for_label}}" value="{{field.value|default_if_none:''}}">
                                             {% endif %}
                                         {% endfor %}
                                     </div>
@@ -84,27 +84,27 @@
                                     </div>
                                 </p>
                                 <div id="dicom-block" class="legacy-style-5">
-                                    <label for="id_accepted_data_use_0">Si tu estudio versa sobre patología hepática, ¿aceptas que usemos tus datos para la creación de un proyecto piloso de un algoritmo de IA de Imagen Médica? Al aceptar participar tu estudio se cargará en una base de datos que será utilizado en un futuro para el desarrollo de un algoritmo de inteligencia artificial sobre lesiones hepáticas. Te mantendremos informado con los resultados</label>
+                                    <label for="accepted_data_use">Si tu estudio versa sobre patología hepática, ¿aceptas que usemos tus datos para la creación de un proyecto piloso de un algoritmo de IA de Imagen Médica? Al aceptar participar tu estudio se cargará en una base de datos que será utilizado en un futuro para el desarrollo de un algoritmo de inteligencia artificial sobre lesiones hepáticas. Te mantendremos informado con los resultados</label>
                                     <select name="{{ form2.accepted_data_use.name }}" id="{{ form2.accepted_data_use.name }}" class="w-select">
                                         {% for choice in form2.accepted_data_use.field.choices %}
                                             <option value="{{ choice.0 }}" {% if choice.0 == form2.accepted_data_use.value %}selected{% endif %}>{{ choice.1 }}</option>
                                         {% endfor %}
                                     </select>
                                     <div id="tagging-block" class="legacy-style-5">
-                                        <label for="id_cie_11_tagging">Etiquetado de patología según CIE-11</label>
+                                        <label for="cie_11_tagging">Etiquetado de patología según CIE-11</label>
                                         <select name="{{ form2.cie_11_tagging.name }}" id="{{ form2.cie_11_tagging.name }}" class="w-select">
                                             {% for choice in form2.cie_11_tagging.field.choices %}
                                                 <option value="{{ choice.0 }}" {% if choice.0 == form2.cie_11_tagging.value %}selected{% endif %}>{{ choice.1 }}</option>
                                             {% endfor %}
                                         </select>
-                                        <label for="id_interested_region">Región de interés patológica</label>
+                                        <label for="interested_region">Región de interés patológica</label>
                                         <select name="{{ form2.interested_region.name }}" id="{{ form2.interested_region.name }}" class="w-select">
                                             {% for choice in form2.interested_region.field.choices %}
                                                 <option value="{{ choice.0 }}" {% if choice.0 == form2.interested_region.value %}selected{% endif %}>{{ choice.1 }}</option>
                                             {% endfor %}
                                         </select>
                                         <div id="other-block" class="legacy-style-5">
-                                            <label for="id_other_field">Otras:</label>
+                                            <label for="other_interested_region">Otras:</label>
                                             <textarea type="text" class="text-area w-input" name="{{form2.other_interested_region.name}}" id="{{form2.other_interested_region.name}}">{{form2.other_interested_region.value|default_if_none:''}}</textarea>
                                         </div>
                                     </div>
@@ -149,10 +149,10 @@
                             {% else %}
                                 {% if field.name != 'accepted_data_use' and field.name != 'cie_11_tagging' and field.name != 'interested_region' and field.name != 'other_interested_region' %}
                                     {% if field.name == 'axial_description' or field.name == 'coronal_description' or field.name == 'sagital_description' %}
-                                        <label for="id_{{field.name}}">{{field.label}}: </label>
-                                        <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{% if field.value %}{{field.value}}{% endif %}</textarea>
+                                        <label for="{{field.id_for_label}}">{{field.label}}: </label>
+                                        <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.id_for_label}}">{% if field.value %}{{field.value}}{% endif %}</textarea>
                                     {% else %}
-                                        <label for="id_{{field.name}}">{{field.label}}: </label>
+                                        <label for="{{field.id_for_label}}">{{field.label}}: </label>
                                         <p>{{ field }}</p>
                                     {% endif %}
                                 {% endif %}

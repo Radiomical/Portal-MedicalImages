@@ -108,20 +108,13 @@ def signup(request):
     else:
         return redirect('blog:home')
 
-def profile_initial(user):
-    profile = UserProfile.objects.filter(user=user).first()
-    if profile is None:
-        return {}
-    return {'user_country': profile.country, 'user_academic_year': profile.academic_year,
-            'user_work_location': profile.work_location, 'user_medical_specialty': profile.medical_specialty}
-
 def update_user_profile(request):
     if not request.user.is_authenticated:
         return redirect(reverse('users:login'))
     else:
         if request.method == 'GET':
             form = ChangePasswordForm()
-            form2 = UserUpdateForm(initial=profile_initial(request.user))
+            form2 = UserUpdateForm()
             get_current_user_mail = request.user.email
             return render(request, 'users/user_dashboard.html', {'form': form, 'form2': form2, 'email': get_current_user_mail})
 
@@ -154,13 +147,13 @@ def user_dashboard(request):
     else:
         if request.method == 'GET':
             form = ChangePasswordForm()
-            form2 = UserUpdateForm(initial=profile_initial(request.user))
+            form2 = UserUpdateForm()
             get_current_user_mail = request.user.email
             return render(request, 'users/user_dashboard.html', {'form': form, 'form2': form2, 'email': get_current_user_mail})
 
         elif request.method == 'POST':
             form = ChangePasswordForm(request.POST)
-            form2 = UserUpdateForm(initial=profile_initial(request.user))
+            form2 = UserUpdateForm()
             if form.is_valid():
                 user = request.user
                 user.password = make_password(form.cleaned_data['password1'])

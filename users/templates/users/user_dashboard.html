@@ -3,7 +3,6 @@
 {% block content %}
 <section class="page-wrapper">
   <h1>Bienvenido {{ user.username }}</h1>
-  <p>{{ email }}</p>
   {% if message %}<div class="profile-card" role="status">{{ message }}</div>{% endif %}
   <div class="profile-grid">
     <form id="password_update_form" class="profile-card" method="post" action="{% url 'users:user_dashboard' %}">

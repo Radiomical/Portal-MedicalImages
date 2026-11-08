@@ -44,10 +44,9 @@ class SpanishInterfaceTests(TestCase):
         for name, value in [('seram_link',post.seram_link),('radiopedia_link',post.radiopedia_link)]:
             self.assertEqual(next(item for item in parser.inputs if item.get('name') == name)['value'], value)
 
-    def test_profile_get_prefills_without_writing(self):
+    def test_profile_get_preserves_legacy_blank_form_without_writing(self):
         response = self.client.get('/users/profile/')
-        self.assertEqual(response.context['form2'].initial['user_work_location'], 'Synthetic institute')
-        self.assertEqual(response.context['form2'].initial['user_country'], 'Spain')
+        self.assertEqual(response.context['form2'].initial, {})
         self.assertContains(response, 'id="password_update_form"')
         self.assertContains(response, 'id="profile_update_form"')
         self.assertEqual(UserProfile.objects.get(user=self.user).work_location, 'Synthetic institute')
@@ -73,3 +72,25 @@ class SpanishInterfaceTests(TestCase):
                 for name, value in data.items():
                     if name in ('title','content','fisiopathology','clinical_case','clinical_signs','doppler','preparation','sequential','pediatrics','medical_report','seram_link','radiopedia_link','other_interested_region'):
                         self.assertIn(value, body, name)
+
+    def test_editor_labels_resolve_to_unique_existing_controls(self):
+        from collections import Counter
+        class Labels(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids = []
+                self.targets = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if attrs.get('id'):
+                    self.ids.append(attrs['id'])
+                if tag == 'label' and attrs.get('for'):
+                    self.targets.append(attrs['for'])
+        post = Post.objects.create(title='Synthetic labels', content='Synthetic only', author=self.user)
+        for path in ('/users/profile/new-post/', f'/edit-blog/{post.pk}/'):
+            response = self.client.get(path)
+            parser = Labels()
+            parser.feed(response.content.decode())
+            self.assertTrue(parser.targets)
+            self.assertFalse([value for value, count in Counter(parser.ids).items() if count > 1])
+            self.assertFalse(set(parser.targets) - set(parser.ids))
