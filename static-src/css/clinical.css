@@ -17,3 +17,25 @@ body.clinical{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 In
 .legacy-style-3{text-align: justify;}
 .legacy-style-4{margin-top: 30px}
 .legacy-style-5{display: none;}
+
+/* Account/editor pages share the Clinical shell and keep all legacy fields. */
+.clinical-hero h1{overflow-wrap:anywhere;max-width:960px}.hero-search{margin-top:22px}
+.clinical .full-page-wrapper{min-height:65vh;padding:42px 20px;display:grid;place-items:start center}
+.clinical .admin-form-card{width:100%;max-width:480px;background:white;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 8px 28px #10342e08;margin:0}
+.clinical .form-card-header{margin-bottom:24px}.clinical .form-card-header h2{font-size:28px}
+.clinical .form-card-footer{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:22px;font-size:13px}
+.clinical .form-card-footer .below-card-link{width:100%;margin:4px 0 0}
+.clinical label{display:block;font-size:13px;font-weight:600;color:var(--ink);margin:12px 0 7px}
+.clinical input.w-input,.clinical textarea.w-input,.clinical select.w-select{width:100%;max-width:100%;min-width:0;background:#f7faf9;color:var(--ink);padding:11px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;line-height:1.5}
+.clinical textarea.w-input{min-height:130px;resize:vertical}.clinical input[type=file]{width:100%;max-width:100%;padding:12px;background:white;border:1px dashed #a8c6bc;border-radius:9px;font-size:13px}
+.clinical input[type=radio]{accent-color:var(--green);margin-right:8px}.clinical .button{padding:12px 20px;min-height:44px;font-size:14px;font-weight:650;border:0;cursor:pointer}
+.clinical .user-form-error-msg{color:#8a2828}.clinical .w-form-fail{border-radius:9px;padding:12px;margin:12px 0;background:#fff1ef}
+.clinical .page-wrapper{max-width:1180px;margin:auto;padding:30px 32px 60px}.clinical .page-wrapper .section{padding:0}.clinical .page-wrapper .container{width:100%;max-width:none;padding:20px 0;margin:0}
+.clinical .page-wrapper .w-form{min-width:0}.clinical .post-page-grid-new-entry{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.clinical .page-wrapper h2{overflow-wrap:anywhere}.clinical .page-wrapper form>.container{background:white;padding:26px;border:1px solid var(--line);border-radius:18px;margin:20px 0}
+.clinical .profile-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}.clinical .profile-card{background:white;border:1px solid var(--line);border-radius:18px;padding:26px;min-width:0}
+.clinical .modal{background:#0b1c1acc}.clinical .modal-content{max-width:580px;width:calc(100% - 36px);padding:28px;border-radius:20px;color:var(--ink);background:white}
+@media(max-width:900px){.clinical .post-page-grid-new-entry{grid-template-columns:repeat(2,minmax(0,1fr))}.clinical .profile-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.clinical .post-page-grid-new-entry{grid-template-columns:1fr;gap:0}.clinical .page-wrapper{padding:18px 18px 36px}.clinical .page-wrapper form>.container{padding:18px}.clinical .full-page-wrapper{padding:24px 18px}.clinical .admin-form-card{padding:24px 20px}.clinical .profile-card{padding:20px}.clinical .section-heading{align-items:flex-start;flex-direction:column;gap:12px}.clinical .clinical-hero h1{font-size:32px}.clinical .site-links{gap:12px 16px}.clinical .pagination{flex-wrap:wrap}}
+.clinical .profile-card input,.clinical .profile-card select{display:block;width:100%;max-width:100%;margin-bottom:16px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#f7faf9;font:inherit;color:var(--ink)}
+.clinical .profile-card .clinical-button{margin-top:12px}.clinical .errorlist,.clinical .form-errors{color:#8a2828;font-size:13px}.clinical .form-errors{padding:14px;background:#fff1ef;border-radius:10px}

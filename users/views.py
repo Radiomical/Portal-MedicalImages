@@ -108,13 +108,20 @@ def signup(request):
     else:
         return redirect('blog:home')
 
+def profile_initial(user):
+    profile = UserProfile.objects.filter(user=user).first()
+    if profile is None:
+        return {}
+    return {'user_country': profile.country, 'user_academic_year': profile.academic_year,
+            'user_work_location': profile.work_location, 'user_medical_specialty': profile.medical_specialty}
+
 def update_user_profile(request):
     if not request.user.is_authenticated:
         return redirect(reverse('users:login'))
     else:
         if request.method == 'GET':
             form = ChangePasswordForm()
-            form2 = UserUpdateForm()
+            form2 = UserUpdateForm(initial=profile_initial(request.user))
             get_current_user_mail = request.user.email
             return render(request, 'users/user_dashboard.html', {'form': form, 'form2': form2, 'email': get_current_user_mail})
 
@@ -147,13 +154,13 @@ def user_dashboard(request):
     else:
         if request.method == 'GET':
             form = ChangePasswordForm()
-            form2 = UserUpdateForm()
+            form2 = UserUpdateForm(initial=profile_initial(request.user))
             get_current_user_mail = request.user.email
             return render(request, 'users/user_dashboard.html', {'form': form, 'form2': form2, 'email': get_current_user_mail})
 
         elif request.method == 'POST':
             form = ChangePasswordForm(request.POST)
-            form2 = UserUpdateForm()
+            form2 = UserUpdateForm(initial=profile_initial(request.user))
             if form.is_valid():
                 user = request.user
                 user.password = make_password(form.cleaned_data['password1'])
@@ -202,12 +209,12 @@ def new_post(request):
                         object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
                         if settings.CASE_MEDIA_DUAL_WRITE:
                             sync_uploaded_case(post_instance.pk, object_metadata)
-                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Case created.', 'error': False})
+                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Entrada creada.', 'error': False})
                 except ValidationError as error:
                     form2.add_error(None, error)
                 except Exception:
-                    form2.add_error(None, 'Storage failed. No case was saved. Contact the administrator before retrying.')
-                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No case was saved.', 'error': True})
+                    form2.add_error(None, 'Error de almacenamiento. No se guardó ninguna entrada. Contacta con el administrador antes de volver a intentarlo.')
+                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No se guardó ninguna entrada.', 'error': True})
             else:
                 content = request.POST.get('content')
                 title = request.POST.get('title')

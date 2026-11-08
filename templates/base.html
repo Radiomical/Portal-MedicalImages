@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,26 +12,26 @@
   {% block extra_css %}{% endblock %}
 </head>
 <body class="clinical">
-<a class="skip-link" href="#main-content">Skip to content</a>
-{% if synthetic_preview %}<div class="preview-banner" role="note">SYNTHETIC PREVIEW · READ ONLY · NO PATIENT DATA</div>{% endif %}
+<a class="skip-link" href="#main-content">Saltar al contenido</a>
+{% if synthetic_preview %}<div class="preview-banner" role="note">VISTA SINTÉTICA · SOLO LECTURA · SIN DATOS DE PACIENTES</div>{% endif %}
 <header class="site-header">
   <div class="site-nav">
     <a class="site-brand" href="{% url 'blog:home' %}"><span class="brand-mark" aria-hidden="true">R</span><span>RadiologyModels <small>PORTAL</small></span></a>
-    <nav aria-label="Main navigation" class="site-links">
-      <a href="{% url 'blog:all_blogs' %}">Cases</a>
-      <a href="{% url 'blog:search' %}">Search</a>
+    <nav aria-label="Navegación principal" class="site-links">
+      <a href="{% url 'blog:all_blogs' %}">Entradas</a>
+      <a href="{% url 'blog:search' %}">Buscar</a>
       {% if not synthetic_preview %}
         {% if user.is_authenticated %}
-        <a href="{% url 'users:user_dashboard' %}">My profile</a>
-        <a class="clinical-button" href="{% url 'users:new_post' %}">Share a case</a>
-        <form action="{% url 'users:logout' %}" method="post">{% csrf_token %}<button class="text-button" type="submit">Log out</button></form>
-        {% else %}<a href="{% url 'users:login' %}">Log in</a><a class="clinical-button" href="{% url 'users:signup' %}">Join the community</a>{% endif %}
-      {% else %}<span class="preview-label">Read-only preview</span>{% endif %}
+        <a href="{% url 'users:user_dashboard' %}">Perfil</a>
+        <a class="clinical-button" href="{% url 'users:new_post' %}">Nueva entrada</a>
+        <form action="{% url 'users:logout' %}" method="post">{% csrf_token %}<button class="text-button" type="submit">Cerrar sesión</button></form>
+        {% else %}<a href="{% url 'users:login' %}">Iniciar sesión</a><a class="clinical-button" href="{% url 'users:signup' %}">Registro</a>{% endif %}
+      {% else %}<span class="preview-label">Vista de solo lectura</span>{% endif %}
     </nav>
   </div>
 </header>
 <main id="main-content" tabindex="-1">{% block content %}{% endblock %}</main>
-<footer class="site-footer"><span>RadiologyModels Portal</span><span>Shared learning. Not a diagnostic viewer.</span><a href="/cookies/">Cookie information</a></footer>
+<footer class="site-footer"><span>RadiologyModels Portal</span><span>Aprendizaje compartido. No es un visor diagnóstico.</span><a href="/cookies/">Aviso de cookies</a></footer>
 <script defer src="{% static 'js/clinical.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>

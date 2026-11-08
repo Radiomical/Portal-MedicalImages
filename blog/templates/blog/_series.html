@@ -1,8 +1,8 @@
-<section class="image-series" aria-label="{{ series_name }} image series" data-series data-endpoint="{% url 'blog:series_slice' post.id plane %}" data-count="{{ images }}">
-<div class="series-heading"><h2>{{ series_name }}</h2><span>EDUCATIONAL IMAGES</span></div>
-<div class="series-frame" tabindex="0" aria-label="{{ series_name }} images. Use left and right arrow keys to change slice."><img alt="{{ series_name }} slice 1 of {{ images }}" data-current-slice hidden></div>
-<p data-series-status role="status">Loading image…</p>
-<div class="series-controls" hidden><button type="button" data-previous aria-label="Previous {{ series_name }} slice">←</button><label class="sr-only" for="slice-{{ series_id }}">{{ series_name }} slice</label><input id="slice-{{ series_id }}" type="range" min="1" max="{{ images }}" value="1" step="1"><output aria-live="polite">1 / {{ images }}</output><button type="button" data-next aria-label="Next {{ series_name }} slice">→</button></div>
-<noscript>JavaScript is required to load this bounded image series.</noscript>
-{% if description %}<details class="series-description"><summary>Series description</summary><p>{{ description|linebreaksbr }}</p></details>{% endif %}
+<section class="image-series" aria-label="{{ series_name }} - serie de imágenes" data-series data-endpoint="{% url 'blog:series_slice' post.id plane %}" data-count="{{ images }}">
+<div class="series-heading"><h2>{{ series_name }}</h2><span>IMÁGENES EDUCATIVAS</span></div>
+<div class="series-frame" tabindex="0" aria-label="{{ series_name }} - imágenes. Usa las flechas izquierda y derecha para cambiar de corte."><img alt="{{ series_name }} - corte 1 de {{ images }}" data-current-slice hidden></div>
+<p data-series-status role="status">Cargando imagen…</p>
+<div class="series-controls" hidden><button type="button" data-previous aria-label="Corte anterior: {{ series_name }}">←</button><label class="sr-only" for="slice-{{ series_id }}">Corte: {{ series_name }}</label><input id="slice-{{ series_id }}" type="range" min="1" max="{{ images }}" value="1" step="1"><output aria-live="polite">1 / {{ images }}</output><button type="button" data-next aria-label="Corte siguiente: {{ series_name }}">→</button></div>
+<noscript>Se necesita JavaScript para cargar esta serie de imágenes de forma limitada.</noscript>
+{% if description %}<details class="series-description"><summary>Descripción de la serie</summary><p>{{ description|linebreaksbr }}</p></details>{% endif %}
 </section>

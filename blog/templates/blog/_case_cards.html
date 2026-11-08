@@ -2,8 +2,8 @@
 <div class="case-grid">
 {% for post in case_posts %}
 <article class="case-card">
-  <a class="case-cover" tabindex="-1" aria-hidden="true" href="{% url 'blog:blog_page' post.title post.id %}">{% with image=post_images|get_item:post.id %}{% if image %}<img src="{{ image }}" alt="" loading="lazy">{% else %}<span class="cover-placeholder">No preview image</span>{% endif %}{% endwith %}</a>
+  <a class="case-cover" tabindex="-1" aria-hidden="true" href="{% url 'blog:blog_page' post.title post.id %}">{% with image=post_images|get_item:post.id %}{% if image %}<img src="{{ image }}" alt="" loading="lazy">{% else %}<span class="cover-placeholder">Sin imagen de portada</span>{% endif %}{% endwith %}</a>
   <div class="case-card-body"><span class="case-category">{{ post.category }}</span><h2><a href="{% url 'blog:blog_page' post.title post.id %}">{{ post.title }}</a></h2><p>{{ post.content|truncatechars:140 }}</p><div class="case-byline"><span class="author-dot" aria-hidden="true"></span>{{ post.author }} <span>· {{ post.date_posted|date:"d M Y" }}</span></div></div>
 </article>
-{% empty %}<div class="empty-state"><h2>No cases found</h2><p>Try a different search or browse all cases.</p><a href="{% url 'blog:all_blogs' %}">Browse cases</a></div>{% endfor %}
+{% empty %}<div class="empty-state"><h2>No se han encontrado entradas</h2><p>Prueba otra búsqueda o consulta todas las entradas.</p><a href="{% url 'blog:all_blogs' %}">Ver entradas</a></div>{% endfor %}
 </div>

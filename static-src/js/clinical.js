@@ -21,7 +21,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const display = (entry) => {
     image.hidden = false;
     image.src = entry.url;
-    image.alt = `${series.getAttribute("aria-label")} slice ${index + 1} of ${total}`;
+    image.alt = `${series.getAttribute("aria-label")} - corte ${index + 1} de ${total}`;
   };
   const warmNext = () => {
     const adjacent = cache.get(index + 1);
@@ -40,7 +40,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     output.value = `${index + 1} / ${total}`;
     previous.disabled = index === 0;
     next.disabled = index === total - 1;
-    status.textContent = "Loading image…";
+    status.textContent = "Cargando imagen…";
     image.hidden = true;
     // Remove old src so a late error from the previous image cannot renew it.
     image.removeAttribute("src");
@@ -70,7 +70,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       warmNext();
     } catch (error) {
       if (token !== generation || error.name === "AbortError") return;
-      status.textContent = "Image unavailable. Change slice to try again.";
+      status.textContent = "Imagen no disponible. Cambia de corte para volver a intentarlo.";
     }
   };
   image.addEventListener("load", () => { status.textContent = ""; });
@@ -80,7 +80,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       renewalAttempted = true;
       show(index, true);
     } else {
-      status.textContent = "Image unavailable. Change slice to try again.";
+      status.textContent = "Imagen no disponible. Cambia de corte para volver a intentarlo.";
     }
   });
   previous.addEventListener("click", () => show(index - 1));
