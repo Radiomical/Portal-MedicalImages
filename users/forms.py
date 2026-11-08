@@ -3,7 +3,7 @@ import pycountry
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Post, FilePost, UserProfile
+from .models import Post, FilePost, UserProfile, COUNTRY_CHOICES
 from django.db.models.fields import BLANK_CHOICE_DASH
 
 
@@ -61,7 +61,7 @@ class SignupForm (UserCreationForm):
             return cleaned_data
 
 class UserUpdateForm(forms.Form):
-    user_country = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(country.name, country.name) for country in pycountry.countries], label='País', required=False)
+    user_country = forms.ChoiceField(choices=BLANK_CHOICE_DASH + COUNTRY_CHOICES, label='País', required=False)
     user_academic_year = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(academic_year, academic_year) for academic_year in UserProfile.academic_year_list], label='Año de formación', required=False)
     user_work_location = forms.CharField(max_length=100, required=False, label='Centro de trabajo')
     user_medical_specialty = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(medical_specialty, medical_specialty) for medical_specialty in UserProfile.medical_specialty_list], label='Especialidad médica', required=False)

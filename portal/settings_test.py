@@ -9,6 +9,3 @@ os.environ["EMAIL_BACKEND"] = "django.core.mail.backends.locmem.EmailBackend"
 from .settings import *  # noqa: F403,E402
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 ALLOWED_HOSTS = ["testserver", "localhost"]
-# The published repository has no users migrations. Do not invent a production
-# baseline until the deployed migration state has been compared with the schema.
-MIGRATION_MODULES = {"users": None}

@@ -145,3 +145,16 @@ class UploadCompatibilityTests(SimpleTestCase):
         env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": "synthetic-process-only-test-key-0123456789", "MAX_UPLOAD_FILES": ""}
         result = subprocess.run([sys.executable, "-c", "from django.conf import settings; assert settings.DATA_UPLOAD_MAX_NUMBER_FILES is None"], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+class RecoveredBaselineTests(SimpleTestCase):
+    def test_branding_assets_are_available(self):
+        from django.contrib.staticfiles import finders
+        for name in ["css/style.css", "js/script.js", "images/logo.png", "images/logonrecred1.png", "images/favico.ico"]:
+            with self.subTest(name=name):
+                self.assertIsNotNone(finders.find(name))
+
+    def test_country_choices_keep_existing_labels(self):
+        from users.models import COUNTRY_CHOICES
+        from users.forms import UserUpdateForm
+        self.assertIn(("Turkey", "Turkey"), COUNTRY_CHOICES)
+        self.assertIn(("Turkey", "Turkey"), UserUpdateForm().fields["user_country"].choices)
