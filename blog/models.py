@@ -35,6 +35,9 @@ class Post(models.Model):
     seram_link = models.URLField(blank=True, null=True)
     radiopedia_link = models.URLField(blank=True, null=True)
 
+    class Meta:
+        indexes = [models.Index(fields=['-date_posted', '-id'], name='post_recent_idx')]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._meta.get_field('doppler').blank = not self.is_torax()
