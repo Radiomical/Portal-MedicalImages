@@ -21,3 +21,6 @@ class RuntimeArtifactTests(unittest.TestCase):
             result = subprocess.run(['bash', '-e', '-c', script], cwd=path, env={**os.environ, 'PATH': str(path) + ':' + os.environ['PATH'], 'GITHUB_SHA': '0' * 40}, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((path / 'runtime-artifact/SHA256SUMS').exists())
+
+if __name__ == '__main__':
+    unittest.main()

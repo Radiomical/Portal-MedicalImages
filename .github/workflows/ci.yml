@@ -28,6 +28,7 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements.txt
       - run: pip install pip-audit==2.10.1
       - run: pip-audit -r requirements.txt
+      - run: python scripts/test-runtime-artifact.py
       - run: python manage.py check --settings=portal.settings_test
       - run: python manage.py test tests --settings=portal.settings_test --noinput
       - run: python manage.py test tests --settings=portal.settings_ci_postgres --noinput
