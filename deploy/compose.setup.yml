@@ -1,0 +1,8 @@
+# Use only for the explicit one-off migration/static/seed job.
+services:
+  web:
+    read_only: false
+    restart: 'no'
+    volumes:
+      - staging_static:/app/.local/static:rw
+      - staging_media:/app/.local/media:rw
