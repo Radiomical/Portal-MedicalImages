@@ -140,7 +140,7 @@ SECURE_CSP = {
     "form-action": [CSP.SELF],
 }
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_REFERRER_POLICY = "no-referrer"
+SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 # Short, host-only HSTS. Never extend to unrelated subdomains or preload.
 SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "300"))

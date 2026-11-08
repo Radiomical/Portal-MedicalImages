@@ -15,7 +15,7 @@ class SecurityHeaderTests(TestCase):
             self.assertNotIn(forbidden, policy)
         self.assertEqual(response['X-Frame-Options'], 'DENY')
         self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
-        self.assertEqual(response['Referrer-Policy'], 'no-referrer')
+        self.assertEqual(response['Referrer-Policy'], 'same-origin')
         self.assertEqual(response['Cross-Origin-Opener-Policy'], 'same-origin')
         self.assertIn('camera=()', response['Permissions-Policy'])
         self.assertEqual(response['Cache-Control'], 'private, no-store')
