@@ -72,3 +72,14 @@ class NormalizedReaderTests(TestCase):
         backfill_case(self.post.pk)
         self.assertEqual(Case.objects.get(pk=self.post.pk).cover_key, '')
         self.assertEqual(Case.objects.get(pk=self.post.pk).legacy_metadata['cover_keys'], ['images/cover.jpg'])
+
+    @override_settings(CASE_MEDIA_DUAL_WRITE=True, CASE_MEDIA_NORMALIZED_READ=True)
+    def test_middle_and_trailing_gaps_are_unavailable_for_every_index(self):
+        for position in (60, 119):
+            with self.subTest(position=position):
+                image = Image.objects.get(series__case_id=self.post.pk, series__plane='axial', position=position)
+                data = {field: getattr(image, field) for field in ('series_id', 'position', 'object_key', 'legacy_file_id', 'legacy_description')}
+                image.delete()
+                for index in (0, 65, 119):
+                    self.assertEqual(self.endpoint(index).status_code, 503)
+                Image.objects.create(**data)

@@ -115,3 +115,10 @@ publication or production cutover. No flag or real data was changed in this PR.
 The first legacy row determines a card cover even if blank; later distinct
 cover keys are retained in the manifest without silently changing that display
 choice. This preserves the old card behavior exactly.
+
+A stored expected image count is set only by checked backfill/canonical sync.
+The slice reader checks count and min/max position against it before serving any
+index. This catches interior and trailing deletions, not only a gap adjacent to
+the requested slice. Migration0048 leaves existing counts unknown (NULL); the
+reader returns unavailable until a separately authorized equivalence backfill
+verifies and sets them. It never guesses that a shortened series is complete.

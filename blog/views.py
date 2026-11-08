@@ -115,8 +115,16 @@ def series_slice(request, blog_id, plane):
     normalized = normalized_case(post.pk)
     if normalized is not None:
         from users.models import Image
-        rows = Image.objects.filter(series__case=normalized, series__plane=plane)
-        total = rows.count()
+        from django.db.models import Count, Min, Max
+        series = normalized.series.filter(plane=plane).first()
+        if series is None:
+            raise Http404
+        rows = Image.objects.filter(series=series)
+        stats = rows.aggregate(total=Count('pk'), first=Min('position'), last=Max('position'))
+        total = stats['total']
+        expected = series.expected_image_count
+        if expected is None or total != expected or (total and (stats['first'] != 0 or stats['last'] != total - 1)):
+            return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
         if index < 0 or index >= total:
             raise Http404
         keys = list(rows.filter(position__gte=index, position__lt=index + 2).order_by('position').values_list('object_key', flat=True))

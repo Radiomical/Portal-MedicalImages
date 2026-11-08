@@ -138,6 +138,7 @@ class Series(models.Model):
     PLANES = [('cover', 'Cover'), ('axial', 'Axial'), ('coronal', 'Coronal'), ('sagital', 'Sagittal')]
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='series')
     plane = models.CharField(max_length=8, choices=PLANES)
+    expected_image_count = models.PositiveIntegerField(null=True, blank=True)
     description = models.CharField(max_length=500, blank=True)
     order_basis = models.CharField(max_length=24, default='legacy_pk', choices=[('legacy_pk', 'Legacy PK'), ('explicit', 'Explicit position')])
 
