@@ -36,7 +36,7 @@ def projection(post):
         if result:
             images[plane] = result
             descriptions[plane] = next((item['legacy_description'] for item in result if item['legacy_description'] not in (None, '', 'None')), '')
-    return {'fingerprint': fingerprint, 'metadata': metadata, 'cover_key': metadata['cover_keys'][0] if metadata['cover_keys'] else '', 'images': images, 'descriptions': descriptions}
+    return {'fingerprint': fingerprint, 'metadata': metadata, 'cover_key': (rows[0]['header_image'] or '') if rows else '', 'images': images, 'descriptions': descriptions}
 
 
 def verify_case(case, plan):
@@ -47,6 +47,8 @@ def verify_case(case, plan):
         raise ValueError('Series projection does not match legacy source.')
     for plane, expected in plan['images'].items():
         item = series[plane]
+        if item.expected_image_count is not None and item.expected_image_count != len(expected):
+            raise ValueError('Series expected count differs from the source.')
         if item.description != plan['descriptions'][plane] or item.order_basis != 'legacy_pk':
             raise ValueError('Series metadata differs from the legacy projection.')
         actual = list(item.images.order_by('position').values('position', 'object_key', 'legacy_file_id', 'legacy_description'))
@@ -62,11 +64,14 @@ def backfill_case(post_id):
     existing = Case.objects.filter(pk=post_id).first()
     if existing:
         verify_case(existing, plan)
+        for series in existing.series.all():
+            series.expected_image_count = len(plan['images'][series.plane])
+            series.save(update_fields=['expected_image_count'])
         Case.objects.filter(pk=existing.pk).update(projection_stale=False)
         return False
     case = Case.objects.create(post=post, cover_key=plan['cover_key'], legacy_metadata=plan['metadata'], source_sha256=plan['fingerprint'])
     for plane, rows in plan['images'].items():
-        series = Series.objects.create(case=case, plane=plane, description=plan['descriptions'][plane])
+        series = Series.objects.create(case=case, plane=plane, description=plan['descriptions'][plane], expected_image_count=len(rows))
         Image.objects.bulk_create([Image(series=series, **row) for row in rows], batch_size=500)
     verify_case(case, plan)
     Case.objects.filter(pk=case.pk).update(projection_stale=False)
@@ -92,7 +97,7 @@ def sync_uploaded_case(post_id, object_metadata):
         case.projection_stale = True
         case.save()
         for plane, rows in plan['images'].items():
-            series = Series.objects.create(case=case, plane=plane, description=plan['descriptions'][plane])
+            series = Series.objects.create(case=case, plane=plane, description=plan['descriptions'][plane], expected_image_count=len(rows))
             Image.objects.bulk_create([Image(series=series, **row) for row in rows], batch_size=500)
         verify_case(case, plan)
     else:

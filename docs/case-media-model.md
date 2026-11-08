@@ -92,3 +92,33 @@ because the dual-write flag exists.
 No new object is deleted by refreshing its display manifest. Retained original
 manifests remain protected. No production flag, data, admin configuration or
 public preview was changed during development.
+
+## Staged normalized reader
+
+`CASE_MEDIA_NORMALIZED_READ` defaults false and startup refuses it without
+canonical dual-write enabled. It is not enabled by migrations. For a non-stale
+projected case, cards use the selected cover, detail uses series counts and
+slice endpoints select at most two object references by indexed explicit position
+rather than OFFSET. Case URLs, audience, API fields and signing behavior remain
+unchanged. Missing/unmigrated/stale cases fall back to the legacy reader.
+A detected position gap returns unavailable, not an anatomically shifted slice.
+
+Before enabling outside isolated tests, stop unsupported writes, complete
+projection backfill and equivalence verification, reconcile every object with
+read-back hashes/size and storage location, address metadata conflicts and
+publication review separately, and test all routes. The stale marker covers
+normal ORM/admin mutations, not direct SQL/bulk paths; those require explicit
+invalidation and re-verification. A source fingerprint is metadata integrity,
+not object integrity. Neither reader flag authorizes a media transfer, patient
+publication or production cutover. No flag or real data was changed in this PR.
+
+The first legacy row determines a card cover even if blank; later distinct
+cover keys are retained in the manifest without silently changing that display
+choice. This preserves the old card behavior exactly.
+
+A stored expected image count is set only by checked backfill/canonical sync.
+The slice reader checks count and min/max position against it before serving any
+index. This catches interior and trailing deletions, not only a gap adjacent to
+the requested slice. Migration0048 leaves existing counts unknown (NULL); the
+reader returns unavailable until a separately authorized equivalence backfill
+verifies and sets them. It never guesses that a shortened series is complete.
