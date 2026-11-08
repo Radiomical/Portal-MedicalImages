@@ -32,7 +32,29 @@ jobs:
       - run: python manage.py test tests --settings=portal.settings_test --noinput
       - run: python manage.py test tests --settings=portal.settings_ci_postgres --noinput
       - run: python manage.py makemigrations --check --dry-run --settings=portal.settings_test
-      - run: docker build --tag portal:0.1.0-dev .
+      - run: docker build --tag portal:0.1.0-distroless-ci .
+      - name: Smoke-test the final nonroot runtime
+        run: |
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,size=64m -v "$PWD/scripts/container-smoke.py:/checks/smoke.py:ro" portal:0.1.0-distroless-ci /checks/smoke.py
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,size=64m -v "$PWD/tests:/app/tests:ro" portal:0.1.0-distroless-ci manage.py test tests --settings=portal.settings_test --noinput
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --network host --tmpfs /tmp:rw,size=64m -v "$PWD/tests:/app/tests:ro" portal:0.1.0-distroless-ci manage.py test tests --settings=portal.settings_ci_postgres --noinput
+          docker run --rm --read-only --cap-drop ALL --tmpfs /tmp:rw,size=64m --tmpfs /app/.local/static:rw,uid=65532,gid=65532,size=64m portal:0.1.0-distroless-ci manage.py collectstatic --settings=portal.settings_test --noinput
+      - run: docker build --file Dockerfile.slim-baseline --tag portal:0.1.0-slim-baseline-ci .
+      - name: Install checksum-verified Trivy
+        run: |
+          curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz -o /tmp/trivy.tar.gz
+          echo 'bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf  /tmp/trivy.tar.gz' | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf /tmp/trivy.tar.gz -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+      - name: Audit both images and gate fixable high/critical findings
+        run: ./scripts/image-audit.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: image-audit
+          path: image-audit/
+          retention-days: 14
   secrets:
     runs-on: ubuntu-latest
     steps:
