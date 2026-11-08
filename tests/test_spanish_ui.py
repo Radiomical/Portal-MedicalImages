@@ -51,3 +51,25 @@ class SpanishInterfaceTests(TestCase):
         self.assertContains(response, 'id="password_update_form"')
         self.assertContains(response, 'id="profile_update_form"')
         self.assertEqual(UserProfile.objects.get(user=self.user).work_location, 'Synthetic institute')
+
+    def test_listing_copy_is_fully_spanish(self):
+        response = self.client.get('/all-blogs/')
+        self.assertContains(response, 'Entradas compartidas por la comunidad.')
+        self.assertNotContains(response, 'Clinical context')
+
+    def test_bound_fields_survive_error_render_without_extra_context(self):
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+        from users.forms import PostForm, FilePostForm
+        data = {name: 'Generated retained ' + name for name in ('title','content','fisiopathology','clinical_case','clinical_signs','doppler','preparation','sequential','pediatrics','medical_report')}
+        data.update(category='Abdomen', medical_findings='Sin evaluar', format='DICOM', accepted_data_use='No', seram_link='https://example.invalid/seram', radiopedia_link='https://example.invalid/reference', other_interested_region='Generated retained other')
+        post = Post.objects.create(title='Synthetic error render', content='Synthetic only', author=self.user)
+        request = RequestFactory().get('/')
+        request.user = self.user
+        for template in ('users/create_posts.html','blog/edit_blog_page.html'):
+            with self.subTest(template=template):
+                # Matches a storage-error re-render: no field-specific extras.
+                body = render_to_string(template, {'form':PostForm(data), 'form2':FilePostForm(data), 'post':post, 'post_id':post.pk, 'editing':True, 'error':True}, request=request)
+                for name, value in data.items():
+                    if name in ('title','content','fisiopathology','clinical_case','clinical_signs','doppler','preparation','sequential','pediatrics','medical_report','seram_link','radiopedia_link','other_interested_region'):
+                        self.assertIn(value, body, name)

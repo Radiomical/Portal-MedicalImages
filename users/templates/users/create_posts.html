@@ -85,10 +85,10 @@
                                                 <textarea type="{{field.field.widget.input_type}}" class="text-area w-input" name="{{field.name}}" id="{{field.name}}">{{field.value|default_if_none:''}}</textarea>
                                             {% elif field.name == 'seram_link' %}
                                                 <label for="{{field.name}}">Enlace SERAM: </label>
-                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{seram_link|default_if_none:''}}">
+                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{field.value|default_if_none:''}}">
                                             {% elif field.name == 'radiopedia_link' %}
                                                 <label for="{{field.name}}">Enlace Radiopaedia: </label>
-                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{radiopedia_link|default_if_none:''}}">
+                                                <input type="{{field.field.widget.input_type}}" class="text-field w-input" name="{{field.name}}" id="{{field.name}}" value="{{field.value|default_if_none:''}}">
                                             {% endif %}
                                         {% endfor %}
                                     </div>
@@ -130,7 +130,7 @@
                                         </select>
                                         <div id="other-block" class="legacy-style-5">
                                             <label for="id_other_field">Otras:</label>
-                                            <textarea type="text" class="text-area w-input" name="{{form2.other_interested_region.name}}" id="{{form2.other_interested_region.name}}">{{other_interested_region}}</textarea>
+                                            <textarea type="text" class="text-area w-input" name="{{form2.other_interested_region.name}}" id="{{form2.other_interested_region.name}}">{{form2.other_interested_region.value|default_if_none:''}}</textarea>
                                         </div>
                                     </div>
                                 </div>
