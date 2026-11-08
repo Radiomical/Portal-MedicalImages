@@ -55,6 +55,21 @@ jobs:
           name: image-audit
           path: image-audit/
           retention-days: 14
+      - name: Export the exact audited runtime on next
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        run: |
+          mkdir -p runtime-artifact
+          image="portal-medicalimages:next-${GITHUB_SHA}"
+          docker tag portal:0.1.0-distroless-ci "$image"
+          docker image inspect "$image" > runtime-artifact/image-inspect.json
+          docker save "$image" | gzip -1 > runtime-artifact/runtime.tar.gz
+          (cd runtime-artifact && sha256sum runtime.tar.gz image-inspect.json > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        with:
+          name: audited-runtime-${{ github.sha }}
+          path: runtime-artifact/
+          retention-days: 2
   secrets:
     runs-on: ubuntu-latest
     steps:
