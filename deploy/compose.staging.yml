@@ -11,7 +11,7 @@ services:
       - staging_database:/var/lib/postgresql
     networks: [preview]
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U portal_staging -d portal_staging']
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U portal_staging -d portal_staging']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,7 +32,7 @@ services:
       DATABASE_USER: portal_staging
       DATABASE_SSLMODE: disable
     ports: ['127.0.0.1:8081:8081']
-    networks: [preview]
+    networks: [preview, ingress]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
     cap_drop: [ALL]
@@ -41,6 +41,7 @@ services:
       - staging_static:/app/.local/static:ro
       - staging_media:/app/.local/media:ro
 networks:
+  ingress: {}
   preview:
     internal: true
 volumes:
