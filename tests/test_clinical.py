@@ -14,7 +14,7 @@ class ClinicalInterfaceTests(TestCase):
 
     def test_home_has_local_assets_and_no_trackers(self):
         response = self.client.get('/')
-        for text in ['css/clinical.css', 'js/clinical.js', 'Skip to content', 'viewport', 'Latest cases']:
+        for text in ['css/clinical.css', 'js/clinical.js', 'Saltar al contenido', 'viewport', 'Últimas entradas']:
             self.assertContains(response, text)
         for text in ['googletagmanager', 'WebFont', 'jquery', 'js/script.js']:
             self.assertNotContains(response, text)
@@ -22,13 +22,13 @@ class ClinicalInterfaceTests(TestCase):
 
     def test_case_preserves_content_and_has_real_controls(self):
         response = self.client.get(reverse('blog:blog_page', args=[self.post.title, self.post.pk]))
-        for text in ['Fictional overview', 'Fictional clinical case', 'Fictional example report', 'data-series', 'type="range"', 'slice 1 of 2', 'Not a diagnostic viewer']:
+        for text in ['Fictional overview', 'Fictional clinical case', 'Fictional example report', 'data-series', 'type="range"', 'corte 1 de 2', 'No es un visor diagnóstico']:
             self.assertContains(response, text)
         self.assertNotContains(response, 'MEDIR')
 
     def test_empty_results_and_query_are_escaped(self):
         response = self.client.get('/search/', {'q': '<script>&test'})
-        self.assertContains(response, 'No cases found')
+        self.assertContains(response, 'No se han encontrado entradas')
         self.assertContains(response, '&lt;script&gt;&amp;test')
         self.assertNotContains(response, '<script>&test')
 

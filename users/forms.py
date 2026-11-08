@@ -11,8 +11,8 @@ from django.db.models.fields import BLANK_CHOICE_DASH
 
 class SignupForm (UserCreationForm):
 
-    email = forms.EmailField()
-    username = forms.CharField(max_length=30, error_messages={'required': 'Por favor ingresa tu nombre de usuario'})
+    email = forms.EmailField(label="Correo electrónico")
+    username = forms.CharField(label='Nombre de usuario', max_length=30, error_messages={'required': 'Por favor ingresa tu nombre de usuario'})
     password1 = forms.CharField(label='Contraseña', widget=forms.PasswordInput)
     password2 = forms.CharField(label='Confirmar contraseña', widget=forms.PasswordInput)
 
@@ -76,11 +76,11 @@ class UserUpdateForm(forms.Form):
         fields = ['user_country', 'user_academic_year', 'user_work_location', 'user_medical_specialty']
 
 class LoginForm(forms.Form):
-    email = forms.EmailField()
-    password = forms.CharField(widget=forms.PasswordInput)
+    email = forms.EmailField(label="Correo electrónico")
+    password = forms.CharField(label='Contraseña', widget=forms.PasswordInput)
 
 class ResetPasswordForm(forms.Form):
-    email = forms.EmailField()
+    email = forms.EmailField(label="Correo electrónico")
 
 class ChangePasswordForm(forms.Form):
     password1 = forms.CharField(label='Contraseña', widget=forms.PasswordInput)

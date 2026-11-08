@@ -192,7 +192,7 @@ def edit_blog(request, blog_id):
                     form2.add_error(None, error)
                 except Exception:
                     form2.add_error(None, 'Storage failed. Case changes were not saved. Contact the administrator before retrying.')
-                return render(request, 'blog/edit_blog_page.html', {'form': form, 'form2': form2, 'post': post, 'post_id': post.pk, 'editing': True, 'error': True, 'message': 'Case changes were not saved.'})
+                return render(request, 'blog/edit_blog_page.html', {'form': form, 'form2': form2, 'post': post, 'post_id': post.pk, 'editing': True, 'error': True, 'message': 'No se guardaron los cambios de la entrada.'})
 
             else:
                 content = request.POST.get('content')

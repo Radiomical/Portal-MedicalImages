@@ -202,12 +202,12 @@ def new_post(request):
                         object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
                         if settings.CASE_MEDIA_DUAL_WRITE:
                             sync_uploaded_case(post_instance.pk, object_metadata)
-                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Case created.', 'error': False})
+                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Entrada creada.', 'error': False})
                 except ValidationError as error:
                     form2.add_error(None, error)
                 except Exception:
-                    form2.add_error(None, 'Storage failed. No case was saved. Contact the administrator before retrying.')
-                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No case was saved.', 'error': True})
+                    form2.add_error(None, 'Error de almacenamiento. No se guardó ninguna entrada. Contacta con el administrador antes de volver a intentarlo.')
+                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No se guardó ninguna entrada.', 'error': True})
             else:
                 content = request.POST.get('content')
                 title = request.POST.get('title')
