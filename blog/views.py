@@ -3,7 +3,11 @@ from django.core.exceptions import ValidationError
 from users.uploads import prepare_images, store_case_images
 import os
 from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
+from django.core.files.storage import default_storage
+from django.http import JsonResponse, Http404
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from users.models import FilePost
@@ -16,14 +20,14 @@ def cookies (request):
      return render(request, "aviso-cookies.html")
 
 def home(request):
-    posts = Post.objects.order_by('-date_posted')[:5]
+    posts = case_cards().order_by('-date_posted', '-pk')[:5]
     post_images = retrieve_first_post_image(posts)
 
     return render(request, 'blog/home.html', {'posts': posts, 'post_images': post_images})
 
 
 def all_blogs(request):
-    posts = Post.objects.order_by('-date_posted')
+    posts = case_cards().order_by('-date_posted', '-pk')
     paginator = Paginator(posts, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -33,7 +37,7 @@ def all_blogs(request):
 
 
 def blog_page(request, blog_name, blog_id):
-    post = get_object_or_404(Post, id=blog_id)
+    post = get_object_or_404(Post.objects.select_related('author'), id=blog_id)
     user_profile = UserProfile.objects.filter(user=post.author).first()
     country = academic_year = work_location = medical_specialty = ''
     if user_profile is not None:
@@ -44,30 +48,20 @@ def blog_page(request, blog_name, blog_id):
 
 
     filepost = FilePost.objects.filter(post=post).first()
-    files = FilePost.objects.filter(post=post)
-    axial_post_images_list = list()
-    coronal_post_images_list = list()
-    sagital_post_images_list = list()
-    axial_description = str()
-    coronal_description = str()
-    sagital_description = str()
-
-    for file in files:
-        if file.axial_images:
-            axial_post_images_list.append(file.axial_images.url)
-            if file.axial_description and file.axial_description != 'None':
-                if not axial_description:
-                    axial_description = file.axial_description
-        if file.coronal_images:
-            coronal_post_images_list.append(file.coronal_images.url)
-            if file.coronal_description and file.coronal_description != 'None':
-                if not coronal_description:
-                    coronal_description = file.coronal_description
-        if file.sagital_images:
-            if file.sagital_description and file.sagital_description != 'None':
-                if not sagital_description:
-                    sagital_description = file.sagital_description
-            sagital_post_images_list.append(file.sagital_images.url)
+    # Only counts and descriptions enter the page, never an entire signed stack.
+    series = {}
+    for plane in ('axial', 'coronal', 'sagital'):
+        field = plane + '_images'
+        rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
+        count = rows.count()
+        description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).exclude(**{plane + '_description': 'None'}).values_list(plane + '_description', flat=True).first() or ''
+        series[plane] = {'count': count, 'description': description}
+    axial_description = series['axial']['description']
+    coronal_description = series['coronal']['description']
+    sagital_description = series['sagital']['description']
+    axial_post_images_list = series['axial']['count']
+    coronal_post_images_list = series['coronal']['count']
+    sagital_post_images_list = series['sagital']['count']
 
     if request.user == post.author:
         can_edit = True
@@ -78,22 +72,49 @@ def blog_page(request, blog_name, blog_id):
     return render(request, 'blog/blog_page.html', {'blog_name': blog_name, 'post': post, 'axial_post_images_list': axial_post_images_list, 'coronal_post_images_list': coronal_post_images_list, 'sagital_post_images_list': sagital_post_images_list, 'can_edit': can_edit, 'filepost': filepost, 'country': country, 'academic_year': academic_year, 'work_location': work_location, 'medical_specialty': medical_specialty, 'axial_description': axial_description, 'coronal_description': coronal_description, 'sagital_description': sagital_description})
 
 
+def case_cards():
+    """One cover subquery and author join, not one media query per card."""
+    cover = FilePost.objects.filter(post_id=OuterRef('pk')).order_by('pk').values('header_image')[:1]
+    return Post.objects.select_related('author').annotate(cover_key=Subquery(cover))
+
+
 def retrieve_first_post_image(posts):
-    post_images = {}
+    return {post.pk: default_storage.url(post.cover_key) for post in posts if post.cover_key}
 
-    for post in posts:
-        file = FilePost.objects.filter(post=post).first()
-        if file is not None:
-            post_images[post.id] = file.header_image.url
 
-    return post_images
+@require_GET
+@never_cache
+def series_slice(request, blog_id, plane):
+    """Preserve the current case audience; callers cannot supply an object key.
+
+    R2 signing is local. A response authorizes only the requested image and one
+    adjacent prefetch. It does not fetch the objects or list the R2 bucket.
+    """
+    if plane not in ('axial', 'coronal', 'sagital'):
+        raise Http404
+    post = get_object_or_404(Post, pk=blog_id)
+    try:
+        index = int(request.GET.get('index', '0'))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid slice index.'}, status=400)
+    field = plane + '_images'
+    rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
+    total = rows.count()
+    if index < 0 or index >= total:
+        raise Http404
+    keys = list(rows.values_list(field, flat=True)[index:index + 2])
+    from django.conf import settings
+    ttl = settings.R2_SIGNED_URL_SECONDS if settings.MEDIA_STORAGE == 'r2' else 300
+    return JsonResponse({'index': index, 'total': total, 'ttl': ttl,
+                         'images': [{'index': index + offset, 'url': default_storage.url(key)} for offset, key in enumerate(keys)]})
+
 
 def search(request):
     query = request.GET.get('q')
     post_images = {}
 
     if query:
-        posts = Post.objects.filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-date_posted')
+        posts = case_cards().filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-date_posted', '-pk')
     else:
         posts = Post.objects.none()
 

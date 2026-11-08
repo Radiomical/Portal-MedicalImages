@@ -12,7 +12,7 @@ from django.shortcuts import render
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def post_urls(request):
-    posts = Post.objects.all()
+    posts = Post.objects.select_related('author').order_by('pk')
     post_data = []
 
     for post in posts:
