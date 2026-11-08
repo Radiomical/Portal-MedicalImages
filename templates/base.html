@@ -4,6 +4,7 @@
 
 <html lang="en">
     <head>
+        {% if not synthetic_preview %}
         <!-- Google Tag Manager -->
         <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
             new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -21,6 +22,7 @@
             </script>
 
     
+        {% endif %}
         <meta charset="utf-8" />
         <title>
             {% block title %}{% endblock %}
@@ -39,10 +41,13 @@
     </head>
 
     <body>
+        {% if synthetic_preview %}<div style="padding:12px;text-align:center;background:#d9f0e5;color:#12372b;font-weight:bold">SYNTHETIC PREVIEW - READ ONLY - NO PATIENT DATA</div>{% endif %}
+        {% if not synthetic_preview %}
                 <!-- Google Tag Manager (noscript) -->
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDB536D"
             height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <!-- End Google Tag Manager (noscript) -->
+        {% endif %}
     
         <body>
             <div data-collapse="small" data-animation="default" data-duration="400" data-easing="ease" data-easing2="ease"
@@ -58,7 +63,9 @@
                   </div>
                   <div class="nav-menu">
                     <a href="/" class="nav-link w-nav-link">Home</a>
-                    {% if user.is_authenticated %}
+                    {% if synthetic_preview %}
+                    <span class="nav-link w-nav-link">Read-only preview</span>
+                    {% elif user.is_authenticated %}
                     <a href="{% url 'users:user_dashboard' %}" class="nav-link w-nav-link">Perfil</a>
                     <a href="{% url 'users:new_post' %}" class="nav-link w-nav-link">Nueva entrada</a>
                     <a href="{% url 'users:logout' %}" class="nav-link w-nav-link">Log out</a>

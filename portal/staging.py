@@ -11,3 +11,7 @@ class ReadOnlyPreviewMiddleware:
         if request.path.startswith(('/admin/', '/xxx/', '/api/')) or (request.path.startswith('/users/') and request.path != '/users/login/'):
             return HttpResponseNotFound('Not available in the synthetic preview.')
         return self.get_response(request)
+
+
+def preview_context(request):
+    return {'synthetic_preview': True}
