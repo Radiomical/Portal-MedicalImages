@@ -93,3 +93,14 @@ class MediaDualWriteTests(TestCase):
         self.client.post('/users/profile/new-post/', self.data())
         self.assertTrue(FilePost.objects.exists())
         self.assertFalse(Case.objects.exists())
+
+    def test_admin_style_move_invalidates_both_cases(self):
+        self.client.post('/users/profile/new-post/', self.data())
+        old_case = Case.objects.get()
+        other = Post.objects.create(title='Generated other case', content='Synthetic', author=self.user)
+        backfill_case(other.pk)
+        legacy = FilePost.objects.get()
+        legacy.post = other
+        legacy.save()
+        self.assertTrue(Case.objects.get(pk=old_case.pk).projection_stale)
+        self.assertTrue(Case.objects.get(pk=other.pk).projection_stale)
