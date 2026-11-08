@@ -120,6 +120,7 @@ class OriginalDicom(models.Model):
 class Case(models.Model):
     """Additive media extension. Post remains the case identity and URL source."""
     post = models.OneToOneField(Post, primary_key=True, on_delete=models.CASCADE, related_name='media_case')
+    projection_stale = models.BooleanField(default=True)
     cover_key = models.CharField(max_length=255, blank=True)
     legacy_metadata = models.JSONField(default=dict)
     source_sha256 = models.CharField(max_length=64)

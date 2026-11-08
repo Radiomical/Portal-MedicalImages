@@ -1,6 +1,8 @@
 from django.db import transaction
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from users.uploads import prepare_images, store_case_images
+from users.case_media import sync_uploaded_case
 import os
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Q, OuterRef, Subquery
@@ -148,8 +150,10 @@ def edit_blog(request, blog_id):
                     with transaction.atomic():
                         post_instance = form.save()
                         previous_ids = list(FilePost.objects.filter(post=post_instance).values_list('pk', flat=True))
-                        store_case_images(post_instance, form2.cleaned_data, prepared)
+                        object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
                         FilePost.objects.filter(pk__in=previous_ids).delete()
+                        if settings.CASE_MEDIA_DUAL_WRITE:
+                            sync_uploaded_case(post_instance.pk, object_metadata)
                     return redirect('blog:blog_page', blog_name=post_instance.title, blog_id=post_instance.pk)
                 except ValidationError as error:
                     form2.add_error(None, error)
