@@ -17,7 +17,7 @@
                     href="{% url 'users:signup' %}">Registrate</a><a href="{% url 'users:reset_password' %}" class="below-card-link">¿Has olvidado tu contraseña?</a></div>
         </form>
         {%if error_message%}
-        <div style="display:block" class="w-users-userformerrorstate w-form-fail">
+        <div class="w-users-userformerrorstate w-form-fail legacy-style-1">
             <div class="user-form-error-msg">
                 {{error_message}}
             </div>

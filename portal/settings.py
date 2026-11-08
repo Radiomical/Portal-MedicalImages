@@ -28,6 +28,8 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "portal.security.ResponseSecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -38,7 +40,7 @@ MIDDLEWARE = [
 ]
 ROOT_URLCONF = "portal.urls"
 TEMPLATES = [{"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [BASE_DIR / "templates"], "APP_DIRS": True, "OPTIONS": {"context_processors": [
-    "django.template.context_processors.debug", "django.template.context_processors.request",
+    "django.template.context_processors.csp", "django.template.context_processors.debug", "django.template.context_processors.request",
     "django.contrib.auth.context_processors.auth", "django.contrib.messages.context_processors.messages",
 ]}}]
 WSGI_APPLICATION = "portal.wsgi.application"
@@ -111,3 +113,37 @@ CASE_MEDIA_DUAL_WRITE = env_bool('CASE_MEDIA_DUAL_WRITE', False)
 CASE_MEDIA_NORMALIZED_READ = env_bool('CASE_MEDIA_NORMALIZED_READ', False)
 if CASE_MEDIA_NORMALIZED_READ and not CASE_MEDIA_DUAL_WRITE:
     raise ImproperlyConfigured('Normalized media reads require canonical dual-write enabled.')
+
+# Enforced, nonce-based CSP. No external JavaScript, inline handlers or eval.
+from django.utils.csp import CSP
+from urllib.parse import urlsplit
+_image_origins = [CSP.SELF, "data:", "blob:"]
+if MEDIA_STORAGE == "r2":
+    _endpoint = urlsplit(R2_ENDPOINT_URL)
+    if _endpoint.scheme == "https" and _endpoint.hostname and _endpoint.hostname.endswith(".r2.cloudflarestorage.com") and _endpoint.netloc == _endpoint.hostname:
+        _image_origins.append("https://" + _endpoint.hostname)
+        if R2_IMAGE_BUCKET and all(c.isalnum() or c == "-" for c in R2_IMAGE_BUCKET):
+            _image_origins.append("https://" + R2_IMAGE_BUCKET + "." + _endpoint.hostname)
+SECURE_CSP = {
+    "default-src": [CSP.NONE],
+    "script-src": [CSP.SELF, CSP.NONCE],
+    "script-src-attr": [CSP.NONE],
+    "style-src": [CSP.SELF],
+    "style-src-attr": [CSP.NONE],
+    "img-src": _image_origins,
+    "font-src": [CSP.SELF],
+    "connect-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "frame-src": [CSP.NONE],
+    "frame-ancestors": [CSP.NONE],
+    "base-uri": [CSP.NONE],
+    "form-action": [CSP.SELF],
+}
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+# Short, host-only HSTS. Never extend to unrelated subdomains or preload.
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "300"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+X_FRAME_OPTIONS = "DENY"

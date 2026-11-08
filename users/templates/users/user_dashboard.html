@@ -35,7 +35,7 @@
                 </form>
                 {% for field, errors in form.errors.items %}
                     {% for error in errors %}
-                        <div style="display:block" class="w-users-userformerrorstate w-form-fail"><div class="user-form-error-msg">{{error}}</div></div>
+                        <div class="w-users-userformerrorstate w-form-fail legacy-style-1"><div class="user-form-error-msg">{{error}}</div></div>
                     {% endfor %}
                 {% endfor %}
                 {%if message%}

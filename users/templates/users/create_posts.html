@@ -5,15 +5,15 @@
 {% if show_popup %}
   <div id="myModal" class="modal">
     <div class="modal-content">
-        <h3 class="modal-title" id="staticBackdropLabel" style="color: rgb(255, 0, 0); text-align: center;" > <strong>AVISO IMPORTANTE</strong></h3>
-        <div class="text-center" style="text-align: justify;">
+        <h3 class="modal-title legacy-style-2" id="staticBackdropLabel" > <strong>AVISO IMPORTANTE</strong></h3>
+        <div class="text-center legacy-style-3">
             RadiologyModels no se hace responsable del contenido subido. <br> Por tanto, se recomienda encarecidamente no subir información que comprometa la intimidad de pacientes
             <br>En cuyo caso la entrada será borrada y será comunicada la eliminación del usuario en el portal.
           </div>
-      <button id="modalBtn" class="button" style="margin-top: 30px">Acepto</button>
+      <button id="modalBtn" class="button legacy-style-4">Acepto</button>
     </div>
   </div>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     const modal = document.getElementById('myModal');
     const modalBtn = document.getElementById('modalBtn');
 
@@ -107,14 +107,14 @@
                                         {% endfor %}
                                     </div>
                                 </p>
-                                <div id="dicom-block" style="display: none;">
+                                <div id="dicom-block" class="legacy-style-5">
                                     <label for="id_accepted_data_use_0">Si tu estudio versa sobre patología hepática, ¿aceptas que usemos tus datos para la creación de un proyecto piloso de un algoritmo de IA de Imagen Médica? Al aceptar participar tu estudio se cargará en una base de datos que será utilizado en un futuro para el desarrollo de un algoritmo de inteligencia artificial sobre lesiones hepáticas. Te mantendremos informado con los resultados</label>
                                     <select name="{{ form2.accepted_data_use.name }}" id="{{ form2.accepted_data_use.name }}" class="w-select">
                                         {% for choice in form2.accepted_data_use.field.choices %}
                                             <option value="{{ choice.0 }}" {% if choice.0 == form2.accepted_data_use.value %}selected{% endif %}>{{ choice.1 }}</option>
                                         {% endfor %}
                                     </select>
-                                    <div id="tagging-block" style="display: none;">
+                                    <div id="tagging-block" class="legacy-style-5">
                                         <label for="id_cie_11_tagging">Etiquetado de patología según CIE-11</label>
                                         <select name="{{ form2.cie_11_tagging.name }}" id="{{ form2.cie_11_tagging.name }}" class="w-select">
                                             {% for choice in form2.cie_11_tagging.field.choices %}
@@ -127,13 +127,13 @@
                                                 <option value="{{ choice.0 }}" {% if choice.0 == form2.interested_region.value %}selected{% endif %}>{{ choice.1 }}</option>
                                             {% endfor %}
                                         </select>
-                                        <div id="other-block" style="display: none;">
+                                        <div id="other-block" class="legacy-style-5">
                                             <label for="id_other_field">Otras:</label>
                                             <textarea type="text" class="text-area w-input" name={{form2.other_interested_region.name}} id={{form2.other_interested_region.name}}>{{other_interested_region}}</textarea>
                                         </div>
                                     </div>
                                 </div>
-                                <script>
+                                <script nonce="{{ csp_nonce }}">
                                     var formatRadio = document.querySelector('input[name="format"]:checked');
                                     if (formatRadio && formatRadio.value === "DICOM") {
                                         document.getElementById("dicom-block").style.display = "block";
@@ -189,12 +189,12 @@
                     </form>
                     {% for field, errors in form2.errors.items %}
                         {% for error in errors %}
-                            <div style="display:block" class="w-users-userformerrorstate w-form-fail"><div class="user-form-error-msg">{{error}}</div></div>
+                            <div class="w-users-userformerrorstate w-form-fail legacy-style-1"><div class="user-form-error-msg">{{error}}</div></div>
                         {% endfor %}
                     {% endfor %}
                     {% for field, errors in form.errors.items %}
                     {% for error in errors %}
-                        <div style="display:block" class="w-users-userformerrorstate w-form-fail"><div class="user-form-error-msg">{{error}}</div></div>
+                        <div class="w-users-userformerrorstate w-form-fail legacy-style-1"><div class="user-form-error-msg">{{error}}</div></div>
                     {% endfor %}
                 {% endfor %}
                 {%if message%}
