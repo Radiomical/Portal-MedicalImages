@@ -25,7 +25,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 user = User.objects.create_user('synthetic-author', 'synthetic@example.invalid', password=None)
                 UserProfile.objects.create(user=user)
-                post = Post.objects.create(title='Synthetic demonstration', content='Synthetic demonstration only. No patient data or diagnostic image.', author=user, category='Abdomen', clinical_case='Fictional case for interface testing only.')
+                post = Post.objects.create(title='Synthetic demonstration', content='Synthetic demonstration only. No patient data or diagnostic image.', author=user, medical_findings='', category='Abdomen', clinical_case='Fictional case for interface testing only.')
                 FilePost.objects.create(post=post, header_image='synthetic/preview.jpg', axial_images='synthetic/preview.jpg', accepted_data_use='No')
         except Exception:
             path.unlink(missing_ok=True)

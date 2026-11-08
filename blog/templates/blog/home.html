@@ -1,35 +1,6 @@
 {% extends "base.html" %}
-{% load blogtags %}
-{% block title %}Home - Portal RadiologyModels{% endblock %}
+{% block title %}Cases - RadiologyModels Portal{% endblock %}
 {% block content %}
-    <div class="page-wrapper">
-        <div class="section light-color-gradient wf-section">
-            <div class="container">
-                <div class="w-layout-grid hero-grid">
-                    <div class="text-box _500px">
-                        <h1 class="heading h1">Entradas del servidor PORTAL.RADIOLOGYMODELS</h1>
-                        <p class="paragraph large">Sube tus entradas para compartirlas con la comunidad. Se añadirán a RadiologyModels</p>
-                        <div class="spacer _16"></div><a href="#entradas" class="button w-button">Ver últimas entradas</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <div id="entradas" class="section wf-section">
-        <div class="container">
-            <div class="section-top">
-                <h2 class="heading h3">Ultimas entradas</h2>
-                <a href="{% url 'blog:all_blogs' %}" class="button light mobile-hidden w-button">Ver todas las entradas</a>
-            </div>
-            <div class="w-dyn-list">
-                <div role="list" class="large-3-grid w-dyn-items">
-                    {% for post in posts %}
-                        <div role="listitem" class="post-box w-dyn-item"><a href="{% url 'blog:blog_page' post.title post.id %}" class="post-thumbnail w-inline-block"> <img src="{{ post_images|get_item:post.id }}" alt="{{post.title}}" class="image-cover" /></a>
-                        <div class="paragraph small">{{post.author}}</div><a href="{% url 'blog:blog_page' post.title post.id %}" class="card-text-link w-inline-block"><h2 class="heading h3">{{post.title}}</h2><p class="paragraph small">{{post.content|truncatechars:100}}</p></a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<section class="clinical-hero content-width"><div class="eyebrow">A COMMUNITY OF SHARED LEARNING</div><h1>Learn from cases.<br><span>One slice at a time.</span></h1><p>Explore image series with clinical context, findings and example reports, shared by the community.</p>{% include 'blog/_search_form.html' %}<div class="hero-note">{% if synthetic_preview %}Fictional content for interface testing only.{% else %}Educational cases. Not for diagnostic use.{% endif %}</div></section>
+<section class="content-width case-section" aria-labelledby="latest-heading"><div class="section-heading"><div><div class="eyebrow">EXPLORE THE COLLECTION</div><h2 id="latest-heading">Latest cases</h2></div><a class="secondary-link" href="{% url 'blog:all_blogs' %}">View all cases →</a></div>{% include 'blog/_case_cards.html' with case_posts=posts %}</section>
 {% endblock %}
