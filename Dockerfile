@@ -3,7 +3,9 @@ FROM python:3.13.17-slim-trixie@sha256:d98cc29d3266e535dd9da1099688d9cb3ca475381
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 WORKDIR /build
 COPY requirements.txt .
-RUN python -m venv /opt/venv && /opt/venv/bin/pip install --require-hashes -r requirements.txt
+RUN python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --require-hashes -r requirements.txt \
+    && /opt/venv/bin/python -m pip uninstall -y pip
 # Distroless Python lives in /usr/bin, not the builder's /usr/local/bin.
 RUN rm /opt/venv/bin/python /opt/venv/bin/python3 /opt/venv/bin/python3.13 \
     && ln -s /usr/bin/python3 /opt/venv/bin/python \

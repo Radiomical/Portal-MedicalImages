@@ -1,5 +1,6 @@
 """Run inside the final image, without production credentials or data."""
 import importlib
+import importlib.util
 import io
 import os
 import pathlib
@@ -12,6 +13,7 @@ assert os.getuid() == 65532
 assert sys.prefix == '/opt/venv', sys.prefix
 assert not pathlib.Path('/bin/sh').exists()
 assert not pathlib.Path('/usr/bin/pip').exists()
+assert importlib.util.find_spec('pip') is None
 assert pathlib.Path(ssl.get_default_verify_paths().cafile).is_file()
 for name in ('django', 'gunicorn', 'boto3', 'numpy', 'pydicom', 'psycopg'):
     importlib.import_module(name)
