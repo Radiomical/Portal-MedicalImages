@@ -122,3 +122,37 @@ index. This catches interior and trailing deletions, not only a gap adjacent to
 the requested slice. Migration0048 leaves existing counts unknown (NULL); the
 reader returns unavailable until a separately authorized equivalence backfill
 verifies and sets them. It never guesses that a shortened series is complete.
+
+## Explicit read-back reconciliation
+
+`python manage.py media_reconcile` reports aggregate manifest counts only and
+reads no objects. `--read-objects` additionally requires the exact database name,
+current storage label, a quiescent source declaration, a positive byte budget
+and maximum object size. `--include-originals` is a separate opt-in, never the
+default. These safeguards do not create permission for real data access or cost.
+This command has only been tested on generated fixtures; no actual case object
+was read or transferred during its development.
+
+Read-back streams bytes into a size/SHA256 comparison. It does not sign URLs,
+list buckets, upload, delete, rename, retry uncertain writes, update manifests,
+adopt unknown legacy hashes or mark publication/integrity states approved.
+Unknown baseline, mismatch, missing, unavailable storage, conflicting hashes for
+a shared key, provider failure or exhausted limit produces an incomplete audit
+and nonzero command result. Provider errors are not classified as absence, and
+provider bodies/keys are not printed. Each shared key is read once; conflicting
+reference metadata is reported, not silently skipped. A limit check may read one
+extra probe byte before stopping; no further objects are attempted on read error
+or byte-limit failure. Memory is bounded to1MiB chunks plus metadata.
+
+Display objects are read only from the configured current backend; a manifest
+pointing elsewhere is unavailable, not silently redirected. Originals, when
+explicitly included, use their recorded private filesystem or distinct R2 bucket,
+never a public download route. Remote404 responses without a filesystem-style
+FileNotFoundError are reported conservatively as read errors, not known missing.
+
+A clean audit compares referenced objects only. It does not prove no orphans
+exist, no objects changed after the audit, or clinical anonymization. An orphan
+inventory requires a separately authorized inventory/manifest and operator
+reconciliation. Unknown legacy baselines need a trusted source manifest, not
+accepting whatever bytes happen to be at a key. Partial-write cleanup stays a
+manual explicit retention decision; nothing here deletes an uncertain object.
