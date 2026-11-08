@@ -12,7 +12,7 @@ body.clinical{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 In
 @media(prefers-reduced-motion:reduce){.case-card{transition:none}.case-card:hover{transform:none}}
 
 /* Preserved legacy form presentation, compatible with strict CSP. */
-.legacy-style-1{display:block}
+.clinical .w-form-fail.legacy-style-1{display:block}
 .legacy-style-2{color: rgb(255, 0, 0); text-align: center;}
 .legacy-style-3{text-align: justify;}
 .legacy-style-4{margin-top: 30px}
