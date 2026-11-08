@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from .models import Post, FilePost, UserProfile, COUNTRY_CHOICES
+from .email_policy import normalized_users
 from django.db.models.fields import BLANK_CHOICE_DASH
 
 
@@ -18,6 +19,12 @@ class SignupForm (UserCreationForm):
     class Meta:
         model = User
         fields = ('username', 'email', 'password1', 'password2')
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if normalized_users(email).exists():
+            raise forms.ValidationError('El correo ya existe')
+        return email
 
     def clean_username(self):
 
@@ -42,8 +49,6 @@ class SignupForm (UserCreationForm):
         if password1 != password2:
             raise forms.ValidationError('Las contraseñas no coinciden')
 
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError('El correo ya existe')
 
         if password1 and len(password1) < 8:
             raise forms.ValidationError('La contraseña debe tener al menos 8 caracteres')

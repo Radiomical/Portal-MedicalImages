@@ -90,6 +90,14 @@ class FilePost(models.Model):
     other_interested_region = models.CharField(max_length=100, blank=True, null=True)
 
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(category__in=['Abdomen', 'Torax', 'Ginecología', 'Pediatría', 'Neurología', 'Musculoesquelético', 'Otras']), name='filepost_category_valid'),
+            models.CheckConstraint(condition=models.Q(format__isnull=True) | models.Q(format__in=['', 'JPEG, JPG', 'DICOM']), name='filepost_format_valid'),
+            models.CheckConstraint(condition=models.Q(accepted_data_use__isnull=True) | models.Q(accepted_data_use__in=['', 'Si', 'No']), name='filepost_consent_valid'),
+        ]
+
+
 class OriginalDicom(models.Model):
     """Private retention manifest only. No URL, public field or filename."""
     post = models.ForeignKey(Post, on_delete=models.PROTECT, related_name='retained_originals')
@@ -98,6 +106,15 @@ class OriginalDicom(models.Model):
     sha256 = models.CharField(max_length=64)
     byte_size = models.PositiveBigIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(storage_location__in=['r2', 'filesystem']), name='original_storage_valid'),
+            models.CheckConstraint(condition=models.Q(sha256__regex=r'^[0-9a-f]{64}$'), name='original_sha256_valid'),
+            models.CheckConstraint(condition=models.Q(byte_size__gt=0), name='original_size_positive'),
+            models.CheckConstraint(condition=~models.Q(object_key=''), name='original_key_nonempty'),
+        ]
 
 
 class Case(models.Model):
