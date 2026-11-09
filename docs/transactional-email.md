@@ -20,11 +20,11 @@ or credential fails startup. Existing custom SMTP configuration stays available
 with the default `EMAIL_PROVIDER=custom`. Tests use an in-memory backend; staging
 continues to disable mail. No email is sent on startup or by changing settings.
 
-Signup and password-reset mail continue to use `DEFAULT_FROM_EMAIL`. They do not
-add Reply-To. Recipients replying to no-reply may not reach an attended inbox.
-Adding an attended Reply-To later is a separate configuration/product decision,
-not an invented contact address. A provider change does not change application
-recipients, reset tokens, activation URLs, templates or audience permissions.
+Signup and password-reset mail continue to use `DEFAULT_FROM_EMAIL`. By default
+they omit Reply-To; an optional `DEFAULT_REPLY_TO_EMAIL` can route replies to a
+configured monitored inbox as described below. An empty value preserves the
+current behavior. A provider change does not change application recipients,
+reset tokens, activation URLs, templates or audience permissions.
 
 ## Domain preparation
 
@@ -69,3 +69,19 @@ resetting credentials or retrying real messages.
   https://resend.com/docs/dashboard/domains/dmarc
 - Delivered semantics:
   https://resend.com/docs/webhooks/emails/delivered
+
+## Optional reply address at container startup
+
+`DEFAULT_REPLY_TO_EMAIL` accepts one plain, valid email address. It defaults to
+empty, which adds no Reply-To header and preserves existing behavior. A nonempty
+invalid address (including lists, display names or header newlines) fails startup.
+The value applies to activation and password-reset mail for both SMTP providers.
+It changes only Reply-To, never From, recipients, subject, message or token.
+
+Inject the value using the deployment environment or Docker `--env-file` at
+container creation. No address is built into the image. `.env.example` is a
+partial, secret-free example, not a complete production environment. To change
+an existing container, update its environment and recreate it from the same
+image. A simple process restart does not replace the container environment.
+An empty value and container recreation remove the Reply-To override again.
+Never invent an unattended address or change production as part of this code PR.

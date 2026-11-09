@@ -34,6 +34,17 @@ class EmailConfigurationTests(SimpleTestCase):
             with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
                 email_configuration({'EMAIL_PORT': value})
 
+    def test_optional_reply_to_validation_for_both_providers(self):
+        for base in ({}, {'EMAIL_PROVIDER': 'resend',
+                         'DEFAULT_FROM_EMAIL': 'no-reply@notifications.example.test',
+                         'EMAIL_HOST_PASSWORD': 'synthetic-fixture-only'}):
+            self.assertEqual(email_configuration(base)['DEFAULT_REPLY_TO_EMAIL'], '')
+            self.assertEqual(email_configuration(base | {'DEFAULT_REPLY_TO_EMAIL': 'support@example.test'})['DEFAULT_REPLY_TO_EMAIL'], 'support@example.test')
+            for address in ('invalid', 'a@example.test,b@example.test',
+                            'Name <a@example.test>', 'a@example.test\r\nBcc: bad@example.test'):
+                with self.subTest(address=address, provider=base.get('EMAIL_PROVIDER')), self.assertRaises(ImproperlyConfigured):
+                    email_configuration(base | {'DEFAULT_REPLY_TO_EMAIL': address})
+
     def test_resend_pins_tls_and_never_silently_uses_console(self):
         config = email_configuration({'EMAIL_PROVIDER': 'resend', 'DEFAULT_FROM_EMAIL': 'no-reply@notifications.example.test',
                                       'EMAIL_HOST_PASSWORD': 'synthetic-fixture-only',
@@ -69,16 +80,26 @@ class EmailConfigurationTests(SimpleTestCase):
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
-                   DEFAULT_FROM_EMAIL='no-reply@notifications.example.test')
+                   DEFAULT_FROM_EMAIL='no-reply@notifications.example.test',
+                   DEFAULT_REPLY_TO_EMAIL='')
 class TransactionalMailIdentityTests(TestCase):
     def test_signup_and_reset_use_configured_sender_without_reply_to(self):
+        self.check_transactional_identity([])
+
+    @override_settings(DEFAULT_REPLY_TO_EMAIL='support@example.test')
+    def test_signup_and_reset_use_optional_reply_to(self):
+        self.check_transactional_identity(['support@example.test'])
+
+    def check_transactional_identity(self, expected_reply_to):
         response = self.client.post('/users/signup/', {'username': 'mail-fixture',
             'email': 'recipient@example.test', 'password1': 'Synthetic-Fixture-937!',
             'password2': 'Synthetic-Fixture-937!'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].from_email, 'no-reply@notifications.example.test')
-        self.assertEqual(mail.outbox[0].reply_to, [])
+        self.assertEqual(mail.outbox[0].reply_to, expected_reply_to)
+        if not expected_reply_to:
+            self.assertNotIn('Reply-To', mail.outbox[0].message())
         self.assertEqual(mail.outbox[0].to, ['recipient@example.test'])
         from django.contrib.auth.models import User
         user = User.objects.get(username='mail-fixture')
@@ -88,5 +109,7 @@ class TransactionalMailIdentityTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(mail.outbox[1].from_email, 'no-reply@notifications.example.test')
-        self.assertEqual(mail.outbox[1].reply_to, [])
+        self.assertEqual(mail.outbox[1].reply_to, expected_reply_to)
+        if not expected_reply_to:
+            self.assertNotIn('Reply-To', mail.outbox[1].message())
         self.assertEqual(mail.outbox[1].to, ['recipient@example.test'])

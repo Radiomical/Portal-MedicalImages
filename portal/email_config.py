@@ -5,6 +5,12 @@ from django.core.exceptions import ValidationError
 
 
 def email_configuration(environ):
+    reply_to = environ.get('DEFAULT_REPLY_TO_EMAIL', '')
+    if reply_to:
+        try:
+            validate_email(reply_to)
+        except ValidationError as error:
+            raise ImproperlyConfigured('DEFAULT_REPLY_TO_EMAIL must be a single valid email address or empty') from error
     provider = environ.get('EMAIL_PROVIDER', 'custom')
     if provider not in {'custom', 'resend'}:
         raise ImproperlyConfigured('EMAIL_PROVIDER must be custom or resend')
@@ -17,7 +23,7 @@ def email_configuration(environ):
         if not environ.get('EMAIL_HOST_PASSWORD', ''):
             raise ImproperlyConfigured('Resend requires EMAIL_HOST_PASSWORD from the secret store')
         # Provider mode is explicit: never fall back to console or plaintext mail.
-        return {'EMAIL_PROVIDER': provider,
+        return {'DEFAULT_REPLY_TO_EMAIL': reply_to, 'EMAIL_PROVIDER': provider,
                 'EMAIL_BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
                 'EMAIL_HOST': 'smtp.resend.com', 'EMAIL_PORT': 587,
                 'EMAIL_HOST_USER': 'resend',
@@ -33,7 +39,7 @@ def email_configuration(environ):
         raise ImproperlyConfigured('EMAIL_PORT must be an integer') from error
     if not 1 <= port <= 65535:
         raise ImproperlyConfigured('EMAIL_PORT must be between 1 and 65535')
-    return {'EMAIL_PROVIDER': provider,
+    return {'DEFAULT_REPLY_TO_EMAIL': reply_to, 'EMAIL_PROVIDER': provider,
             'EMAIL_BACKEND': environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend'),
             'EMAIL_HOST': environ.get('EMAIL_HOST', ''),
             'EMAIL_PORT': port,
