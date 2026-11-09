@@ -56,7 +56,8 @@ Supply configuration through the process environment or a private container
 | `DATABASE_SSLMODE` | PostgreSQL TLS mode, `require` by default |
 | `MEDIA_ROOT`, `STATIC_ROOT` | Separate filesystem locations |
 | `R2_IMAGE_PUBLIC_BASE_URL` | Optional HTTPS custom-domain origin for explicitly public display images; unset retains signed URLs. See `docs/public-image-cache.md` |
-| `EMAIL_BACKEND` | Console by default. Configure an approved backend for live mail |
+| `EMAIL_PROVIDER` | `custom` by default; opt-in `resend` pins SMTP587/STARTTLS with secret-only credentials. See `docs/transactional-email.md` |
+| `EMAIL_BACKEND` | Console by default in custom mode. Resend mode uses the SMTP backend |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings when using that backend |
 | `DEFAULT_FROM_EMAIL` | Deployment mail identity |
 | `SECURE_COOKIES` | True by default |

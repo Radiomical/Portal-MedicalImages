@@ -62,13 +62,9 @@ STATICFILES_DIRS = [BASE_DIR / "static-src"]
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", str(BASE_DIR / ".local" / "media")))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@localhost")
+from .email_config import email_configuration
+for _email_setting, _email_value in email_configuration(os.environ).items():
+    globals()[_email_setting] = _email_value
 PASSWORD_RESET_TIMEOUT = 86400
 REST_FRAMEWORK = {"EXCEPTION_HANDLER": "api.helpers.utils.custom_exception_handler"}
 # Preserve inherited series capacity until upload limits are validated with real workloads.
