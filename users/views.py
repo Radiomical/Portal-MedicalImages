@@ -6,7 +6,7 @@ from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.hashers import make_password
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.db import transaction, IntegrityError
 from .email_policy import email_user
 from django.contrib.sites.shortcuts import get_current_site
@@ -87,13 +87,10 @@ def signup(request):
                 'token': account_activation_token.make_token(user),
             })
 
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
+            EmailMessage(
+                subject, message, settings.DEFAULT_FROM_EMAIL, [user.email],
+                reply_to=[settings.DEFAULT_REPLY_TO_EMAIL] if settings.DEFAULT_REPLY_TO_EMAIL else [],
+            ).send(fail_silently=False)
 
             if user.email:
                 msg = 'Usuario creado correctamente. Verifica tu correo electrónico para activar la cuenta.'
@@ -268,13 +265,10 @@ def reset_password(request):
                     'token': reset_password_token.make_token(user),
                 })
 
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                    fail_silently=False,
-                )
+                EmailMessage(
+                    subject, message, settings.DEFAULT_FROM_EMAIL, [user.email],
+                    reply_to=[settings.DEFAULT_REPLY_TO_EMAIL] if settings.DEFAULT_REPLY_TO_EMAIL else [],
+                ).send(fail_silently=False)
 
                 return render(request, 'users/reset_password.html', {'message': 'Si la cuenta existe, se enviará un correo electrónico con las instrucciones para restablecer la contraseña.'})
             else:
