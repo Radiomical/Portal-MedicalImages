@@ -89,6 +89,11 @@ R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
 R2_IMAGE_BUCKET = os.environ.get('R2_IMAGE_BUCKET', '')
 R2_DICOM_BUCKET = os.environ.get('R2_DICOM_BUCKET', '')
 R2_SIGNED_URL_SECONDS = int(os.environ.get('R2_SIGNED_URL_SECONDS', '300'))
+# Empty preserves private signed URLs and supports configuration-only rollback.
+from .media_config import validate_public_image_origin, image_csp_origins
+R2_IMAGE_PUBLIC_BASE_URL = validate_public_image_origin(os.environ.get('R2_IMAGE_PUBLIC_BASE_URL', ''))
+if R2_IMAGE_PUBLIC_BASE_URL and (MEDIA_STORAGE != 'r2' or not R2_IMAGE_BUCKET or not R2_DICOM_BUCKET or R2_IMAGE_BUCKET == R2_DICOM_BUCKET):
+    raise ImproperlyConfigured('Public images require R2 and distinct configured image and private DICOM buckets')
 if MEDIA_STORAGE == 'r2':
     STORAGES = {
         'default': {'BACKEND': 'portal.storage.PrivateImageStorage'},
@@ -116,14 +121,9 @@ if CASE_MEDIA_NORMALIZED_READ and not CASE_MEDIA_DUAL_WRITE:
 
 # Enforced, nonce-based CSP. No external JavaScript, inline handlers or eval.
 from django.utils.csp import CSP
-from urllib.parse import urlsplit
 _image_origins = [CSP.SELF, "data:", "blob:"]
 if MEDIA_STORAGE == "r2":
-    _endpoint = urlsplit(R2_ENDPOINT_URL)
-    if _endpoint.scheme == "https" and _endpoint.hostname and _endpoint.hostname.endswith(".r2.cloudflarestorage.com") and _endpoint.netloc == _endpoint.hostname:
-        _image_origins.append("https://" + _endpoint.hostname)
-        if R2_IMAGE_BUCKET and all(c.isalnum() or c == "-" for c in R2_IMAGE_BUCKET):
-            _image_origins.append("https://" + R2_IMAGE_BUCKET + "." + _endpoint.hostname)
+    _image_origins.extend(image_csp_origins(R2_ENDPOINT_URL, R2_IMAGE_BUCKET, R2_IMAGE_PUBLIC_BASE_URL))
 SECURE_CSP = {
     "default-src": [CSP.NONE],
     "script-src": [CSP.SELF, CSP.NONCE],

@@ -55,6 +55,7 @@ Supply configuration through the process environment or a private container
 | `DATABASE_HOST`, `DATABASE_PORT` | PostgreSQL connection, port 5432 by default |
 | `DATABASE_SSLMODE` | PostgreSQL TLS mode, `require` by default |
 | `MEDIA_ROOT`, `STATIC_ROOT` | Separate filesystem locations |
+| `R2_IMAGE_PUBLIC_BASE_URL` | Optional HTTPS custom-domain origin for explicitly public display images; unset retains signed URLs. See `docs/public-image-cache.md` |
 | `EMAIL_BACKEND` | Console by default. Configure an approved backend for live mail |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | SMTP settings when using that backend |
 | `DEFAULT_FROM_EMAIL` | Deployment mail identity |
@@ -118,3 +119,11 @@ Synthetic browser checks also cover signup, new-post and edit-post: the upload
 warning opens and closes, DICOM toggles its consent block, consent toggles tagging,
 and the ICD-11 "Otras" option toggles its required free-text field. These scripts
 use native DOM APIs and do not depend on jQuery or the removed Webflow bundle.
+
+### Optional public image cache
+
+Display images can opt in to stable custom-domain URLs and one-year immutable
+cache headers. Signed URLs remain the default, original DICOM stays in its
+separate private bucket, and no database references change. Cloudflare must be
+configured separately; existing objects with `no-store` require a Cache Response
+Rule, not only a DNS record. See [configuration and verification](docs/public-image-cache.md).
