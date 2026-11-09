@@ -129,3 +129,13 @@ cache headers. Signed URLs remain the default, original DICOM stays in its
 separate private bucket, and no database references change. Cloudflare must be
 configured separately; existing objects with `no-store` require a Cache Response
 Rule, not only a DNS record. See [configuration and verification](docs/public-image-cache.md).
+
+### PostgreSQL CI parity
+
+The database service in CI is pinned to PostgreSQL 18.6 (immutable Docker image
+digest), matching the production Azure major/minor version. The full test suite
+runs against this service both on the runner and inside the final nonroot
+runtime. SQLite remains the fast isolated test path. PostgreSQL 17 is no longer
+the CI target; no database engine upgrade or downgrade is performed by this change.
+Azure-specific extensions, permissions, networking and production-size behavior
+still require the isolated deployment rehearsal and read-only preflight.
