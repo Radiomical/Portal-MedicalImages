@@ -1,12 +1,13 @@
-"""Private S3-compatible media, with no download route for original DICOM."""
+"""S3-compatible images with opt-in public URLs; original DICOM stays private."""
 from pathlib import PurePosixPath
 from functools import cached_property
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, SuspiciousFileOperation
 from django.core.files.base import File
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
+from .media_config import validate_public_image_origin
 import boto3
 from botocore.exceptions import ClientError
 from botocore.config import Config
@@ -20,10 +21,11 @@ def validate_key(name):
 
 @deconstructible
 class PrivateImageStorage(Storage):
-    """URLs are short-lived bearer grants for approved display images only.
+    """Display-image storage; signed by default, explicitly public when configured.
 
-    Callers remain responsible for case-level permission checks before rendering
-    a field URL. This storage must not be used to bypass a private-case policy.
+    Public mode is only for a bucket whose entire contents may be published.
+    It is not an access-control mechanism for private cases. The class name is
+    retained for migration/deployment compatibility.
     """
     @cached_property
     def client(self):
@@ -56,8 +58,10 @@ class PrivateImageStorage(Storage):
     def _save(self, name, content):
         name = self._image_key(name)
         types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
+        cache_control = ('public, max-age=31536000, immutable' if self.public_base_url
+                         else 'private, max-age=60')
         create_object(self.client, self.bucket, name, content,
-                      types[PurePosixPath(name).suffix.lower()], 'private, max-age=60')
+                      types[PurePosixPath(name).suffix.lower()], cache_control)
         return name
 
     def exists(self, name):
@@ -76,8 +80,20 @@ class PrivateImageStorage(Storage):
     def delete(self, name):
         raise NotImplementedError('Object deletion requires an explicit retention workflow')
 
+    @property
+    def public_base_url(self):
+        origin = validate_public_image_origin(getattr(settings, 'R2_IMAGE_PUBLIC_BASE_URL', ''))
+        if origin and (not settings.R2_IMAGE_BUCKET or not settings.R2_DICOM_BUCKET
+                       or settings.R2_IMAGE_BUCKET == settings.R2_DICOM_BUCKET):
+            raise ImproperlyConfigured('Public images require distinct image and private DICOM buckets')
+        return origin
+
     def url(self, name):
         name = self._image_key(name)
+        origin = self.public_base_url
+        if origin:
+            # Never contact R2, HEAD an object, or add per-request query tokens.
+            return origin + '/' + quote(name, safe='/')
         ttl = settings.R2_SIGNED_URL_SECONDS
         if not 30 <= ttl <= 900:
             raise ImproperlyConfigured('Signed image URL expiry must be 30-900 seconds')
