@@ -16,6 +16,24 @@ class EmailConfigurationTests(SimpleTestCase):
         self.assertEqual(config['EMAIL_PORT'], 2525)
         self.assertFalse(config['EMAIL_USE_TLS'])
 
+    def test_custom_tls_preserves_previous_env_bool_semantics(self):
+        for value in ('true', 'TRUE', '1', 'yes', 'YES'):
+            with self.subTest(value=value):
+                self.assertTrue(email_configuration({'EMAIL_USE_TLS': value})['EMAIL_USE_TLS'])
+        for value in ('false', 'FALSE', '0', 'no', ''):
+            with self.subTest(value=value):
+                self.assertFalse(email_configuration({'EMAIL_USE_TLS': value})['EMAIL_USE_TLS'])
+        for value in ('on', 'off', 'True ', 'invalid'):
+            with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
+                email_configuration({'EMAIL_USE_TLS': value})
+        self.assertTrue(email_configuration({})['EMAIL_USE_TLS'])
+        self.assertFalse(email_configuration({})['EMAIL_USE_SSL'])
+
+    def test_custom_port_has_clear_error_for_invalid_values(self):
+        for value in ('', 'invalid', '0', '65536'):
+            with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
+                email_configuration({'EMAIL_PORT': value})
+
     def test_resend_pins_tls_and_never_silently_uses_console(self):
         config = email_configuration({'EMAIL_PROVIDER': 'resend', 'DEFAULT_FROM_EMAIL': 'no-reply@notifications.example.test',
                                       'EMAIL_HOST_PASSWORD': 'synthetic-fixture-only',

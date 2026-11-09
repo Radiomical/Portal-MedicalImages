@@ -27,10 +27,16 @@ def email_configuration(environ):
     tls_value = environ.get('EMAIL_USE_TLS', 'true').lower()
     if tls_value not in {'true', '1', 'yes', 'false', '0', 'no', ''}:
         raise ImproperlyConfigured('EMAIL_USE_TLS must be a boolean')
+    try:
+        port = int(environ.get('EMAIL_PORT', '587'))
+    except (ValueError, TypeError) as error:
+        raise ImproperlyConfigured('EMAIL_PORT must be an integer') from error
+    if not 1 <= port <= 65535:
+        raise ImproperlyConfigured('EMAIL_PORT must be between 1 and 65535')
     return {'EMAIL_PROVIDER': provider,
             'EMAIL_BACKEND': environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend'),
             'EMAIL_HOST': environ.get('EMAIL_HOST', ''),
-            'EMAIL_PORT': int(environ.get('EMAIL_PORT', '587')),
+            'EMAIL_PORT': port,
             'EMAIL_USE_TLS': tls_value in {'1', 'true', 'yes'},
             'EMAIL_USE_SSL': False,
             'EMAIL_HOST_USER': environ.get('EMAIL_HOST_USER', ''),
