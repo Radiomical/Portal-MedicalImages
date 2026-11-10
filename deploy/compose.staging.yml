@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 10
   web:
-    image: portal-medicalimages:0.1.0-alpha.4
+    image: portal-medicalimages:0.1.0-portable-preview
     build:
       context: ..
     restart: unless-stopped
@@ -26,6 +26,7 @@ services:
     env_file: ${PORTAL_STAGING_ENV_FILE:?Set the private staging environment path}
     environment:
       DJANGO_SETTINGS_MODULE: portal.settings_staging
+      DB_ENGINE: postgresql
       DATABASE_HOST: db
       DATABASE_PORT: '5432'
       DATABASE_NAME: portal_staging

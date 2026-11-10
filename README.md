@@ -4,10 +4,9 @@ A Django portal for educational imaging cases and image-series browsing.
 
 ## Development status
 
-The `next` line is an isolated refactor. It is not a production replacement yet.
+The `next` line contains the current refactor and is deployed through explicit, tested artifacts.
 The application targets Python 3.13.17 and Django 6.1.3. Dependencies and hashes
-are locked in `requirements.txt`. Deployment still requires an isolated staging environment and a database/media
-backup and restore rehearsal.
+are locked in `requirements.txt`. Changes still require isolated validation and an approved deployment. Portable synthetic-preview and direct-tunnel production recipes are described in [deploy/README.md](deploy/README.md).
 
 ## Local checks
 
@@ -29,13 +28,12 @@ compatibility with an existing deployed schema.
 docker build -t portal:0.1.0-dev .
 ```
 
-The image runs as UID 10001 and starts Gunicorn on port 8081. Startup does not run
+The image runs as UID 65532 and starts Gunicorn on port 8081. Startup does not run
 migrations, import data or modify the production instance. Configure a separate
 database, media volume and environment for each staging instance. Restrict the
 host port to loopback when a local reverse proxy or tunnel is used.
 
-The image includes WhiteNoise for collected static assets. Recover the original
-CSS, JavaScript and branding into `static-src` before claiming visual parity.
+The image includes WhiteNoise for collected static assets. Application CSS, JavaScript and branding sources are in `static-src`.
 Collect assets into a dedicated `STATIC_ROOT` volume before starting the server.
 Patient images must never be copied into the source tree or container image.
 
@@ -108,10 +106,9 @@ separate verification before publication or reuse of real cases.
 The Clinical F shell, case cards, search and case viewer use local CSS/JavaScript
 and system fonts. The shell no longer loads analytics, remote fonts, jQuery or
 the inherited Webflow JavaScript bundle. A series has a range control, previous /
-next buttons and keyboard arrows; without JavaScript, every image remains visible.
+next buttons and keyboard arrows; JavaScript is required to load the bounded image series.
 There are no measurements, window presets or diagnostic claims. The account and
-editor forms retain their inherited layouts inside the new shell. UI copy is in
-English; stored case content and historical choice labels are preserved.
+editor forms retain their inherited layouts inside the new shell. UI copy is in Spanish; stored case content and historical choice labels are preserved.
 
 Logout is POST-only with CSRF protection. The public synthetic preview continues
 to block writes and private/account routes. This interface change is not a

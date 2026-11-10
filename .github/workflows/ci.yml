@@ -30,6 +30,7 @@ jobs:
       - run: pip-audit -r requirements.txt
       - name: Test bounded viewer navigation
         run: node --test tests/js/viewer.test.cjs
+      - run: python scripts/test-compose-config.py
       - run: python scripts/test-runtime-artifact.py
       - run: python manage.py check --settings=portal.settings_test
       - run: python manage.py test tests --settings=portal.settings_test --noinput
