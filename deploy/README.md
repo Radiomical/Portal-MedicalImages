@@ -240,7 +240,7 @@ Official references:
 The viewer requests URL manifests in pages of at most 128. This is not an object
 LIST/GET on the server and does not change case permissions. Existing two-URL
 and bounded directional requests remain supported. The browser automatically
-prefetches compressed JPEG bytes for up to 24 upcoming slices of the active
+prefetches compressed JPEG bytes for up to 48 upcoming slices of the active
 series, independently of the 64 MiB estimated decoded-pixel budget. Only two
 near neighbors are decoded speculatively. Compressed blobs have a shared 96 MiB
 retained-byte budget, up to three concurrent downloads and an 8 MiB per-object
@@ -250,8 +250,8 @@ are not included. These are not hard limits on browser process memory.
 
 The cache lives in the tab, not persistent storage. Previously viewed and
 prefetched cuts can remain cached until the shared budget evicts them. The
-24-cut target is in the navigation direction, not 24 in both directions or
-24 per inactive series. No manual full-series download is offered. No image
+48-cut target is in the navigation direction, not 48 in both directions or
+48 per inactive series. No manual full-series download is offered. No image
 quality is reduced and no originals/DICOM are fetched. Automatic prefetch
 consumes visitor data and can increase R2 GET operations.
 

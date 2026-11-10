@@ -235,7 +235,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     if (disposed || seriesBytes.activeSeries !== series) return;
     byteTimer = setTimeout(async () => {
       const candidates = [];
-      for (let n = 1; n <= 24; n++) {
+      for (let n = 1; n <= 48; n++) {
         const entry = cache.get(index + direction * n);
         if (fresh(entry) && !entry.byteFailed && !seriesBytes.get(entry.url)) candidates.push(entry);
       }

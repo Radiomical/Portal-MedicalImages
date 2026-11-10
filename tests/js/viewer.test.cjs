@@ -273,13 +273,13 @@ test('series template has no manual preparation UI or event handlers', () => {
   assert.doesNotMatch(template,/data-prepare|data-cancel-prepare|series-prepare/);
   assert.doesNotMatch(source,/prepareSeries|prepareButton|prepareStatus|cancelButton/);
 });
-test('automatic byte prefetch still warms 24 upcoming cuts without a button', async () => {
+test('automatic byte prefetch still warms 48 upcoming cuts without a button', async () => {
   const v=viewer(120,false,false,1,new Set(),false,false,true);await settle();
-  await sleep(650);await settle();
-  assert.equal(v.byteCalls.length,24);
-  assert.deepEqual(v.byteCalls.map(u=>Number(u.match(/(\d+)\.jpg/)[1])).sort((a,b)=>a-b),Array.from({length:24},(_,i)=>i+1));
+  await sleep(1200);await settle();
+  assert.equal(v.byteCalls.length,48);
+  assert.deepEqual(v.byteCalls.map(u=>Number(u.match(/(\d+)\.jpg/)[1])).sort((a,b)=>a-b),Array.from({length:48},(_,i)=>i+1));
   assert.equal(v.get('output').value,'1 / 120');
-  assert.equal(vm.runInNewContext('seriesBytes.bytes',v.context),24*32);
+  assert.equal(vm.runInNewContext('seriesBytes.bytes',v.context),48*32);
   v.windowEvents.pagehide({persisted:false});
 });
 test('automatic byte prefetch follows reversal rather than fetching both directions', async () => {
