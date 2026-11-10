@@ -1,4 +1,4 @@
-{% load static %}
+{% load static assets %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -7,8 +7,8 @@
   <meta name="referrer" content="same-origin">
   <title>{% block title %}RadiologyModels Portal{% endblock %}</title>
   <link rel="icon" href="{% static 'images/favico.ico' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=4bfd45b3ce97">
-  <link rel="stylesheet" href="{% static 'css/clinical.css' %}?v=489e0ed71406">
+  <link rel="stylesheet" href="{% versioned_static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% versioned_static 'css/clinical.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body class="clinical">
@@ -32,7 +32,7 @@
 </header>
 <main id="main-content" tabindex="-1">{% block content %}{% endblock %}</main>
 <footer class="site-footer"><span>RadiologyModels Portal</span><span>Aprendizaje compartido. No es un visor diagnóstico.</span><a href="/cookies/">Aviso de cookies</a></footer>
-<script defer src="{% static 'js/clinical.js' %}?v=79bd0ba3fb85"></script>
+<script defer src="{% versioned_static 'js/clinical.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
