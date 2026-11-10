@@ -262,7 +262,13 @@ approved provider-side deployment prerequisite, not something this PR changes.
 The CSP connect-src allowlist adds only the validated public JPEG custom origin,
 not all image origins or the private DICOM endpoint. Verify CORS on both a cold
 and previously cached URL with the real Origin header after any approved policy
-change. Do not purge caches or change bucket publicity just to make CORS pass.
+change. R2 documents that already-cached assets do not gain new CORS headers
+until refreshed. If the approved policy passes on HEAD/origin but fails on a
+cached GET, arrange an explicitly approved purge limited to the JPEG hostname,
+never Purge Everything. This temporarily increases cold reads/Class B while
+cache repopulates. Preserve any prior policy for rollback; restoring it may
+require the same targeted refresh. Never change bucket publicity to fix CORS.
+See https://developers.cloudflare.com/r2/buckets/cors/ .
 Private/signed-origin setups without this permission retain ordinary Image
 navigation; byte preparation reports an incomplete download and must not claim
 the series is ready. CORS is a browser read permission, not authentication.
