@@ -1,4 +1,5 @@
 """Restrictions for a synthetic-only, public preview."""
+from django.conf import settings
 from django.http import HttpResponseForbidden, HttpResponseNotFound
 
 class ReadOnlyPreviewMiddleware:
@@ -8,7 +9,8 @@ class ReadOnlyPreviewMiddleware:
     def __call__(self, request):
         if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
             return HttpResponseForbidden('This synthetic preview is read-only.')
-        if request.path.startswith(('/admin/', '/xxx/', '/api/')) or (request.path.startswith('/users/') and request.path != '/users/login/'):
+        admin_root = '/' + settings.ADMIN_URL_PATH.rstrip('/')
+        if (request.path == admin_root or request.path.startswith(admin_root + '/')) or request.path.startswith(('/admin/', '/xxx/', '/api/')) or (request.path.startswith('/users/') and request.path != '/users/login/'):
             return HttpResponseNotFound('Not available in the synthetic preview.')
         return self.get_response(request)
 
