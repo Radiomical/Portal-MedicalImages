@@ -178,11 +178,20 @@ test('a stale metadata failure does not block the newest target retry', async ()
 test('stalled foreground and speculative loads time out and release their slots', async () => {
   const v = viewer(120, false, true, 1, new Set(), false, true); await settle();
   v.held.shift()(); await settle();
-  await sleep(70); await settle();
-  assert.equal(v.budget().active, 0);
+  // The runner may delay the pump itself. Start the deadline from observed
+  // work instead of assuming its 40ms timer ran before a fixed 70ms sleep.
+  const deadline = Date.now() + 2000;
+  while ((v.images.length < 3 || v.budget().active !== 0) && Date.now() < deadline) {
+    await sleep(10); await settle();
+  }
+  assert.ok(v.images.length >= 3, 'speculative neighbors must have started');
+  assert.equal(v.budget().active, 0, 'stalled speculation must release both slots');
   v.get('[data-next]').events.click(); await settle();
   v.get('[data-next]').events.click(); await settle();
-  await sleep(20); await settle();
+  const foregroundDeadline = Date.now() + 2000;
+  while (!v.images.includes('/synthetic/2.jpg') && Date.now() < foregroundDeadline) {
+    await sleep(10); await settle();
+  }
   // Newest requested image starts after stale load timeout, not browser timeout.
   assert.ok(v.images.includes('/synthetic/2.jpg'));
   while (v.held.length) {v.held.shift()(); await settle();}
