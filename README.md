@@ -139,3 +139,11 @@ runtime. SQLite remains the fast isolated test path. PostgreSQL 17 is no longer
 the CI target; no database engine upgrade or downgrade is performed by this change.
 Azure-specific extensions, permissions, networking and production-size behavior
 still require the isolated deployment rehearsal and read-only preflight.
+
+### Admin route configuration
+
+`ADMIN_URL_PATH` sets the Django admin URL to one segment with a trailing slash
+(default `xxx/`). Keep installation-specific values in private deployment settings.
+The synthetic preview blocks the configured admin path, including its root.
+This setting is not an access control: protect the admin with identity-based access
+and keep Django staff authentication enabled.
