@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const source = fs.readFileSync('static-src/js/clinical.js', 'utf8');
 const settle = async () => { for (let n = 0; n < 45; n++) await Promise.resolve(); };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set(), deferMetadata = false) {
-  const sets = [], calls = [], images = [], held = [], metaHeld = [];
+function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set(), deferMetadata = false, fastTimeout = false) {
+  const sets = [], calls = [], images = [], held = [], metaHeld = [], windowEvents = {};
   class Element {
     constructor() { this.events = {}; this.attrs = {}; this.clientHeight = 400; }
     addEventListener(name, callback) { this.events[name] = callback; }
@@ -23,12 +23,13 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     return {dataset: {count: String(total), endpoint: `/synthetic/${plane}/slices/`}, querySelector: k => selectors[k], getAttribute: () => 'Synthetic series'};
   });
   const context = {
-    document: {querySelectorAll: () => series}, window: {addEventListener() {}},
-    setTimeout: (fn, ms) => setTimeout(fn, ms).unref(), clearTimeout, Date,
+    document: {querySelectorAll: () => series}, window: {addEventListener(name, callback) {windowEvents[name] = callback;}}, AbortController,
+    setTimeout: (fn, ms) => setTimeout(fn, fastTimeout && ms === 8000 ? 15 : ms).unref(), clearTimeout, Date,
     Image: class {
       constructor() { this.naturalWidth = 512; this.naturalHeight = 512; }
       set src(value) { this.url = value; images.push(value); if (failures.has(value)) queueMicrotask(() => this.onerror?.()); else if (holdImages) held.push(() => this.onload?.()); else queueMicrotask(() => this.onload?.()); }
       get src() { return this.url; }
+      removeAttribute() { this.url = ""; }
       decode() { return Promise.resolve(); }
     },
     fetch: async url => {
@@ -44,7 +45,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     }
   };
   vm.runInNewContext(source, context);
-  return {calls, images, held, metaHeld, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
+  return {calls, images, held, metaHeld, windowEvents, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
     let prevented = false;
     sets[0]['.series-frame'].events.wheel({deltaY, deltaX: 0, deltaMode: 0, preventDefault: () => { prevented = true; }, ...extra});
     return prevented;
@@ -170,4 +171,26 @@ test('a stale metadata failure does not block the newest target retry', async ()
   v.metaHeld.shift()({ok: false}); await settle();
   assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
   assert.equal(v.calls.length, 2);
+});
+
+test('stalled foreground and speculative loads time out and release their slots', async () => {
+  const v = viewer(120, false, true, 1, new Set(), false, true); await settle();
+  v.held.shift()(); await settle();
+  await sleep(70); await settle();
+  assert.equal(v.budget().active, 0);
+  v.get('[data-next]').events.click(); await settle();
+  v.get('[data-next]').events.click(); await settle();
+  await sleep(20); await settle();
+  // Newest requested image starts after stale load timeout, not browser timeout.
+  assert.ok(v.images.includes('/synthetic/2.jpg'));
+  while (v.held.length) {v.held.shift()(); await settle();}
+  assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
+});
+test('back-forward-cache restore reactivates controls and reloads current metadata', async () => {
+  const v = viewer(); await settle();
+  v.windowEvents.pagehide({persisted: true});
+  v.windowEvents.pageshow({persisted: true}); await settle();
+  v.get('[data-next]').events.click(); await settle();
+  assert.equal(v.get('[data-current-slice]').src, '/synthetic/1.jpg');
+  assert.equal(v.get('output').value, '2 / 120');
 });

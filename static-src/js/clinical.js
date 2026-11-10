@@ -56,9 +56,11 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     const before = direction > 0 ? 4 : ahead;
     const after = direction > 0 ? ahead : 4;
     const start = Math.max(0, target - before);
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 8000);
     const task = (async () => {
       const response = await fetch(`${series.dataset.endpoint}?index=${target}&before=${before}&after=${after}`, {
-        credentials: "same-origin", cache: "no-store"
+        signal: abort.signal, credentials: "same-origin", cache: "no-store"
       });
       if (!response.ok) throw new Error("Image unavailable");
       const data = await response.json();
@@ -78,7 +80,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       prune();
     })();
     metadataPending = task;
-    try { await task; } finally { if (metadataPending === task) metadataPending = null; }
+    try { await task; } finally { clearTimeout(timeout); if (metadataPending === task) metadataPending = null; }
   };
   const decode = (entry, speculative = false) => {
     if (entry.decoded) return Promise.resolve(entry.decoded);
@@ -92,6 +94,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     const preload = new Image();
     preload.decoding = "async";
     preload.fetchPriority = speculative ? "low" : "high";
+    let loadTimeout;
     const task = (async () => {
       try {
         const loaded = new Promise((resolve, reject) => {
@@ -99,8 +102,14 @@ document.querySelectorAll("[data-series]").forEach((series) => {
           preload.onerror = () => reject(new Error("Image unavailable"));
         });
         preload.src = entry.url;
-        await loaded;
-        if (preload.decode) await preload.decode();
+        const deadline = new Promise((resolve, reject) => {
+          loadTimeout = setTimeout(() => {
+            preload.onload = null; preload.onerror = null;
+            preload.removeAttribute("src");
+            reject(new Error("Image load timeout"));
+          }, 8000);
+        });
+        await Promise.race([(async () => { await loaded; if (preload.decode) await preload.decode(); })(), deadline]);
         const bytes = preload.naturalWidth * preload.naturalHeight * 4;
         if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("Invalid image size");
         // Do not retain a speculative large image or one evicted during a jump.
@@ -117,6 +126,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
         release(entry);
         throw error;
       } finally {
+        clearTimeout(loadTimeout);
         entry.loading = null;
         if (speculative) {
           viewerBudget.active--;
@@ -209,9 +219,9 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       frame.setAttribute("aria-busy", "false");
     }
   };
-  const show = (value) => {
+  const show = (value, force = false) => {
     const target = Math.max(0, Math.min(total - 1, value));
-    if (target === index && displayed >= 0) return;
+    if (!force && target === index && displayed >= 0) return;
     const now = Date.now();
     if (target !== index) {
       direction = Math.sign(target - index);
@@ -260,6 +270,12 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     clearTimeout(idleTimer); clearTimeout(pumpTimer); clearTimeout(scrubTimer);
     for (const entry of cache.values()) release(entry);
     cache.clear();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    disposed = false;
+    viewerBudget.waiters.add(schedulePump);
+    show(index, true);
   });
   viewerBudget.waiters.add(schedulePump);
   controls.hidden = false;
