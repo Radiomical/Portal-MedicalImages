@@ -243,3 +243,10 @@ test('return to an already decoded cut never waits for an unrelated foreground d
   v.held.shift()();await settle();
   assert.equal(v.get('output').value,'1 / 120');
 });
+test('clearing compressed bytes aborts pending work without disabling the origin or later downloads', async () => {
+  let finish;const pool=bytePool(async () => new Promise(resolve => {finish=resolve;}));const signal=new AbortController().signal;
+  const pending=pool.download('/one.jpg',signal);pool.clear();finish(byteResponse());
+  await assert.rejects(pending,/Cancelled/);assert.equal(pool.disabled.size,0);assert.equal(pool.bytes,0);
+  const next=pool.download('/two.jpg',signal);finish(byteResponse());await next;
+  assert.equal(pool.bytes,32);assert.equal(pool.active,0);
+});

@@ -26,7 +26,8 @@ const seriesBytes = {
     const cancel = () => abort.abort();
     signal.addEventListener('abort', cancel, {once: true});
     this.pending.set(url, abort); this.active++;
-    const timeout = setTimeout(cancel, 12000);
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; cancel(); }, 12000);
     try {
       const response = await fetch(url, {mode: 'cors', credentials: 'omit', cache: 'force-cache', signal: abort.signal, priority: 'low'});
       if (!response.ok || !response.headers.get('Content-Type')?.toLowerCase().startsWith('image/')) throw new Error('Invalid image response');
@@ -56,7 +57,8 @@ const seriesBytes = {
     } catch (error) {
       // A failed CORS policy must not break the ordinary <img> path, nor be
       // retried continuously for every image on the same origin.
-      if (error instanceof TypeError) this.disabled.add(origin);
+      if (error instanceof TypeError && !abort.signal.aborted) this.disabled.add(origin);
+      if (timedOut) throw new Error('Byte download timeout');
       throw error;
     } finally {
       clearTimeout(timeout); signal.removeEventListener('abort', cancel);
@@ -82,7 +84,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const cache = new Map();
   if (!seriesBytes.activeSeries) seriesBytes.activeSeries = series;
   let downloads = new AbortController(), preparation, byteTimer;
-  let manifestAbort, byteUnavailable = false;
+  let manifestAbort;
   let index = 0, displayed = -1, generation = 0, direction = 1;
   let lastMove = 0, fastUntil = 0, metadataPending, foregroundPending;
   let idleTimer, pumpTimer, disposed = false;
@@ -235,17 +237,17 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   };
   const scheduleBytes = () => {
     clearTimeout(byteTimer);
-    if (disposed || byteUnavailable || preparation || seriesBytes.preparing || seriesBytes.activeSeries !== series) return;
+    if (disposed || preparation || seriesBytes.preparing || seriesBytes.activeSeries !== series) return;
     byteTimer = setTimeout(async () => {
       const candidates = [];
       for (let n = 1; n <= 24; n++) {
         const entry = cache.get(index + direction * n);
-        if (fresh(entry) && !seriesBytes.get(entry.url)) candidates.push(entry);
+        if (fresh(entry) && !entry.byteFailed && !seriesBytes.get(entry.url)) candidates.push(entry);
       }
       const batch = candidates.slice(0, 3);
       await Promise.all(batch.map(async entry => {
         try { await seriesBytes.download(entry.url, downloads.signal); }
-        catch (error) { if (!downloads.signal.aborted) byteUnavailable = true; }
+        catch (error) { if (error.name !== 'AbortError') entry.byteFailed = true; }
       }));
       if (batch.length && !disposed && !downloads.signal.aborted &&
           !seriesBytes.disabled.size) scheduleBytes();
