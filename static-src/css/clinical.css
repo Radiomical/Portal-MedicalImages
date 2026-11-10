@@ -39,3 +39,9 @@ body.clinical{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 In
 @media(max-width:600px){.clinical .post-page-grid-new-entry{grid-template-columns:1fr;gap:0}.clinical .page-wrapper{padding:18px 18px 36px}.clinical .page-wrapper form>.container{padding:18px}.clinical .full-page-wrapper{padding:24px 18px}.clinical .admin-form-card{padding:24px 20px}.clinical .profile-card{padding:20px}.clinical .section-heading{align-items:flex-start;flex-direction:column;gap:12px}.clinical .clinical-hero h1{font-size:32px}.clinical .site-links{gap:12px 16px}.clinical .pagination{flex-wrap:wrap}}
 .clinical .profile-card input,.clinical .profile-card select{display:block;width:100%;max-width:100%;margin-bottom:16px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#f7faf9;font:inherit;color:var(--ink)}
 .clinical .profile-card .clinical-button{margin-top:12px}.clinical .errorlist,.clinical .form-errors{color:#8a2828;font-size:13px}.clinical .form-errors{padding:14px;background:#fff1ef;border-radius:10px}
+
+/* Keep long legal text inside the shared reading layout. */
+.cookie-notice{max-width:960px;line-height:1.7;overflow-wrap:anywhere}
+.cookie-notice h1{margin-bottom:1.5rem}
+.cookie-notice h3{margin-top:1.75rem}
+.cookie-notice p{margin:.9rem 0}

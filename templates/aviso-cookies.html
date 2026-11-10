@@ -1,17 +1,7 @@
-
-
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Aviso de Privacidad</title> 
-	
-</head>
-<body>
-	<main>
+{% extends "base.html" %}
+{% block title %}Aviso de cookies - RadiologyModels Portal{% endblock %}
+{% block content %}
+<article class="content-width case-detail-page cookie-notice">
 		
 		<h1>Aviso de Cookies</h1>
 		<h3>¿Qué son las cookies?</h3>
@@ -61,6 +51,5 @@
 		<p>Usted puede eliminar y bloquear todas las cookies de este sitio, pero parte del sitio no funcionará o la calidad de la página web puede verse afectada.</p>
 
 		<p>Si tiene cualquier duda acerca de nuestra política de cookies, puede contactar con esta página web a través de nuestros canales de Contacto.</p>
-	</main>
-</body>
-</html>
+	</article>
+{% endblock %}
