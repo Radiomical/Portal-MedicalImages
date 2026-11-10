@@ -7,10 +7,8 @@ blank. Production Compose overrides the settings explicitly listed in its
 `environment` block, even when an env-file contains another value.
 
 Secret values belong in a protected private file or a secret manager, never Git,
-chat, screenshots, logs or a generated environment dump. Saved secrets are
-write-only to the assistant/user vault interface; a recovery plan uses a secure
-provider replacement or an operator-controlled backup, not a promise to reveal
-saved secrets. No credentials are created or rotated by this document.
+chat, screenshots, logs or a generated environment dump. A recovery plan uses an operator-controlled backup or a secure provider
+replacement. It must not assume that a provider will show an old secret again. No credentials are created or rotated by this document.
 
 ## Compose selection (operator file, not application environment)
 | Variable | Classification | Purpose / constraint | Source or recovery |
