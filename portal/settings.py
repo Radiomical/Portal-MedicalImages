@@ -60,7 +60,7 @@ else:
 # Gunicorn WSGI: reuse a bounded number of connections, never unlimited age.
 # ASGI deployments must set this to 0 or use a supported backend pool instead.
 try:
-    DATABASE_CONN_MAX_AGE = int(os.environ.get("DATABASE_CONN_MAX_AGE", "60"))
+    DATABASE_CONN_MAX_AGE = int(os.environ.get("DATABASE_CONN_MAX_AGE") or "60")
 except ValueError as exc:
     raise ImproperlyConfigured("DATABASE_CONN_MAX_AGE must be an integer") from exc
 if not 0 <= DATABASE_CONN_MAX_AGE <= 60:

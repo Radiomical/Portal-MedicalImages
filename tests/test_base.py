@@ -75,8 +75,8 @@ class ConfigurationIsolationTests(SimpleTestCase):
     def test_postgres_connection_reuse_is_bounded_and_health_checked(self):
         import subprocess, sys
         env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": "synthetic-process-only-test-key-0123456789", "DB_ENGINE": "postgresql"}
-        for value in ("0", "60"):
-            result = subprocess.run([sys.executable, "-c", "from django.conf import settings; import os; db=settings.DATABASES['default']; assert db['CONN_MAX_AGE']==int(os.environ['DATABASE_CONN_MAX_AGE']); assert db['CONN_HEALTH_CHECKS']"], env={**env, "DATABASE_CONN_MAX_AGE": value}, capture_output=True, text=True)
+        for value in ("", "0", "60"):
+            result = subprocess.run([sys.executable, "-c", "from django.conf import settings; import os; db=settings.DATABASES['default']; assert db['CONN_MAX_AGE']==int(os.environ['DATABASE_CONN_MAX_AGE'] or '60'); assert db['CONN_HEALTH_CHECKS']"], env={**env, "DATABASE_CONN_MAX_AGE": value}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
         for value in ("-1", "61", "invalid"):
             result = subprocess.run([sys.executable, "-c", "from django.conf import settings; print(settings.DATABASES)"], env={**env, "DATABASE_CONN_MAX_AGE": value}, capture_output=True, text=True)

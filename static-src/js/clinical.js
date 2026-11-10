@@ -177,7 +177,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       const entry = cache.get(requested);
       // Only one demanded download per series. Rapid changes wait for it and
       // then select the newest target, instead of starting many stale GETs.
-      if (foregroundPending) await foregroundPending;
+      if (foregroundPending) await foregroundPending.catch(() => {});
       if (token !== generation || disposed) return;
       const task = decode(entry);
       foregroundPending = task;

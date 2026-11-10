@@ -143,3 +143,21 @@ test('a late decode cannot overwrite the newest requested slice', async () => {
   v.held.shift()(); await settle();
   assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
 });
+
+test('failure of an older in-flight image does not poison the newest target', async () => {
+  const v = viewer(120, false, true); await settle();
+  v.held.shift()(); await settle();
+  v.get('[data-next]').events.click(); await settle();
+  v.get('[data-next]').events.click(); await settle();
+  // Force the older image to reject after the newer request is waiting for it.
+  const failOld = v.held.shift();
+  // Replace the queued successful load with a rejected decode.
+  // This exercises the same rejected foreground promise as a network error.
+  const original = v.context.Image.prototype.decode;
+  v.context.Image.prototype.decode = function () { return this.src.endsWith('/1.jpg') ? Promise.reject(new Error('stale image failure')) : original.call(this); };
+  failOld(); await settle();
+  assert.equal(v.calls.length, 1, 'new target must not need metadata renewal');
+  v.held.shift()(); await settle();
+  assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
+  assert.equal(v.get('[data-series-status]').textContent, '');
+});
