@@ -41,8 +41,9 @@ MIDDLEWARE = [
 # Deployment-only route; no real installation path belongs in source control.
 import re
 ADMIN_URL_PATH = os.environ.get("ADMIN_URL_PATH", "xxx/")
-if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}/", ADMIN_URL_PATH):
-    raise ImproperlyConfigured("ADMIN_URL_PATH must be one URL segment ending with a slash")
+if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}/", ADMIN_URL_PATH)
+        or ADMIN_URL_PATH.rstrip("/").lower() in {"users", "api", "static", "media", "all-blogs", "blog-page", "media-slice", "search", "edit-blog", "cookies"}):
+    raise ImproperlyConfigured("ADMIN_URL_PATH must be a non-reserved URL segment ending with a slash")
 ROOT_URLCONF = "portal.urls"
 TEMPLATES = [{"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [BASE_DIR / "templates"], "APP_DIRS": True, "OPTIONS": {"context_processors": [
     "django.template.context_processors.csp", "django.template.context_processors.debug", "django.template.context_processors.request",

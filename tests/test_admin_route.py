@@ -20,7 +20,7 @@ class AdminRouteTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_invalid_paths_fail_closed(self):
-        for value in ['', '/', 'nested/path/', '../admin/', 'admin', 'admin/?x', '*']:
+        for value in ['', '/', 'nested/path/', '../admin/', 'admin', 'admin/?x', '*', 'users/', 'api/', 'static/', 'media/', 'search/']:
             env = {**os.environ, 'DJANGO_SETTINGS_MODULE': 'portal.settings',
                    'SECRET_KEY': 'synthetic-admin-route-test-key-0123456789',
                    'ADMIN_URL_PATH': value}
