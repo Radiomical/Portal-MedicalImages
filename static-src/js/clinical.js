@@ -101,10 +101,10 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const prune = () => {
     const [low, high] = bounds();
     for (const [key, entry] of cache) {
-      if (key < low || key > high || !fresh(entry)) {
+      if (key < index - 128 || key > index + 127 || !fresh(entry)) {
         release(entry);
         cache.delete(key);
-      }
+      } else if (key < low || key > high) release(entry);
     }
     // Any former visible image retained for reuse must rejoin the budget.
     for (const [key, entry] of cache) {
@@ -259,6 +259,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     preparation = new AbortController();
     const job = preparation;
     seriesBytes.preparing = job;
+    seriesBytes.activeSeries = series;
     downloads.abort(); downloads = new AbortController();
     clearTimeout(byteTimer);
     // Preparation is explicitly one selected series, up to the global byte

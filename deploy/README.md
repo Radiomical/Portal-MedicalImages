@@ -82,9 +82,10 @@ two connections, not a growing pool. Capacity and reconnection after a database
 restart must be checked for each deployment. An ASGI deployment must disable
 this setting or use its own supported backend pool.
 
-The viewer requests bounded metadata windows (at most 21 URLs), not full-series
-manifests. It warms at most six neighbors per series, prioritizing direction,
-and allows at most two speculative image loads across all series. Retained
+The viewer requests bounded manifest pages (at most 128 URLs) and keeps at most
+256 URL entries per series. The legacy directional interface remains capped
+at 21 URLs. It decodes at most two neighbors of the active series and allows
+at most two speculative image decodes across all series. Retained
 speculative decoded pixels have a shared estimated 64 MiB budget. Current
 visible images, transient decoding and the browser-managed HTTP cache are not
 part of this estimate; it is not a hard limit on browser process memory. Large
