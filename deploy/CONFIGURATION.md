@@ -18,7 +18,7 @@ replacement. It must not assume that a provider will show an old secret again. N
 | `PORTAL_PRODUCTION_ENV_FILE` | Sensitive path | Required absolute path to private application configuration. | Operator creates mode 0600 outside Git; populate from the application rows below. |
 | `PORTAL_STAGING_ENV_FILE` | Sensitive path | Private synthetic-preview configuration and Compose interpolation source. | Operator creates a separate mode-0600 file; never copy production credentials into preview. |
 | `PORTAL_TUNNEL_ENV_FILE` | Sensitive path | Required private connector-only file containing TUNNEL_TOKEN. | Operator creates mode 0600, outside checkout; never give this file to web. |
-| `PORTAL_DATABASE_CA_FILE` | No | Required host CA-bundle file mounted at /run/certs/database-ca.pem. | Obtain the CA chain from current Azure PostgreSQL TLS documentation or the approved OS trust bundle; readable by UID65532, e.g.0644. It is public certificate material. |
+| `PORTAL_DATABASE_CA_FILE` | No | Required host CA-bundle file mounted at /run/certs/database-ca.pem. | Obtain the CA chain from current Azure PostgreSQL TLS documentation or the approved OS trust bundle; readable by UID 65532, e.g. 0644. It is public certificate material. |
 
 ## Application identity and HTTPS
 | Variable | Classification | Purpose / constraint | Source or recovery |
@@ -32,20 +32,20 @@ replacement. It must not assume that a provider will show an old secret again. N
 | `TRUST_PROXY_HTTPS` | No | Production true; trusts X-Forwarded-Proto from an unreachable-by-public origin. | Recipe/network design; validate actual connector header before activation. |
 | `SECURE_COOKIES` | No | Production true for session and CSRF cookies. | Deployment policy; false only for isolated HTTP tests. |
 | `SECURE_SSL_REDIRECT` | No | Production true; preview settings deliberately override to false on the loopback synthetic listener. | Deployment policy; do not disable to hide a tunnel redirect loop. |
-| `SECURE_HSTS_SECONDS` | No | Default300, host-only; neither includeSubDomains nor preload. | Choose a reviewed policy; omit rather than leave an empty integer. |
+| `SECURE_HSTS_SECONDS` | No | Default 300, host-only; neither includeSubDomains nor preload. | Choose a reviewed policy; omit rather than leave an empty integer. |
 
 ## Database and libpq
 | Variable | Classification | Purpose / constraint | Source or recovery |
 | --- | --- | --- | --- |
 | `DB_ENGINE` | No | postgresql in both Compose modes; sqlite only local/tests. | Recipe. |
 | `DATABASE_HOST` | Sensitive identifier | External Azure PostgreSQL DNS name in production; Compose sets db in preview. | Azure portal: selected PostgreSQL flexible server Overview/connection details. Preserve DNS name for verify-full. |
-| `DATABASE_PORT` | No | 5432 unless provider explicitly differs; preview forced5432. | Azure connection details. |
+| `DATABASE_PORT` | No | 5432 unless provider explicitly differs; preview forced 5432. | Azure connection details. |
 | `DATABASE_NAME` | Sensitive identifier | Existing database name; preview forced portal_staging. | Approved DB inventory/connection config or database administrator; server name is not the database name. |
 | `DATABASE_USER` | Sensitive identifier | Application database role; preview forced portal_staging. | Existing private config/database administrator; use the approved least-privilege role, not a guessed server admin. |
 | `DATABASE_PASSWORD` | Yes | Application DB role password; preview also supplies synthetic POSTGRES_PASSWORD via Compose. | Existing authorized private configuration/secret manager. If lost, DBA resets that exact role; Azure admin reset only resets the server administrator, not every app role. Update all dependents and test, never rotate just to migrate. |
 | `DATABASE_SSLMODE` | No | Production verify-full forced; preview disable on isolated network. | Recipe. Hostname and trusted CA must both validate. |
 | `DATABASE_SSLROOTCERT` | No | Container path to the CA file; production Compose forces /run/certs/database-ca.pem. | Mounted PORTAL_DATABASE_CA_FILE, not its host path. Existing deployment may use its OS CA bundle instead. |
-| `DATABASE_CONN_MAX_AGE` | No | 0-60 seconds; omitted/empty defaults60, with health checks. | Operator selects for WSGI worker/DB capacity; set0 for ASGI unless using a supported pool. |
+| `DATABASE_CONN_MAX_AGE` | No | 0-60 seconds; omitted/empty defaults 60, with health checks. | Operator selects for WSGI worker/DB capacity; set 0 for ASGI unless using a supported pool. |
 | `PGOPTIONS` | No, operationally sensitive | Optional libpq session options, not an application feature; a read-only rehearsal may use default_transaction_read_only=on. | Explicit maintenance/test procedure only. Omit in normal writable deployment; never copy a rehearsal guard without reviewing it. |
 | `SSL_CERT_FILE` | No | Optional Python/OpenSSL trust-bundle path inherited by runtime; not the PostgreSQL sslrootcert selector. | Approved base-image/OS CA bundle. Preserve valid trust paths, not secrets; normally image-managed. |
 
@@ -59,14 +59,14 @@ replacement. It must not assume that a provider will show an old secret again. N
 | `R2_IMAGE_BUCKET` | Sensitive identifier | Existing JPEG bucket. Must differ from DICOM bucket for public-image mode. | Cloudflare R2 bucket inventory. Preserve object keys; do not create an empty replacement and call migration done. |
 | `R2_DICOM_BUCKET` | Sensitive identifier | Existing private original-DICOM bucket. | Cloudflare R2 bucket inventory. Keep public access disabled; do not add a public custom domain. |
 | `R2_IMAGE_PUBLIC_BASE_URL` | No | HTTPS custom domain for public JPEG delivery; empty/omitted uses private signed image URLs. | R2 image bucket Custom Domains plus DNS/cache/TLS configuration. This publication choice requires approval. |
-| `R2_SIGNED_URL_SECONDS` | No | Default300 seconds; signed URL lifetime/metadata freshness, not CDN JPEG TTL. | Operator policy. Public URLs do not gain signatures or change every300seconds. |
+| `R2_SIGNED_URL_SECONDS` | No | Default 300 seconds; signed URL lifetime/metadata freshness, not CDN JPEG TTL. | Operator policy. Public URLs do not gain signatures or change every 300 seconds. |
 | `DICOM_RETENTION_ENABLED` | No | Default false; explicit opt-in for retaining uploaded originals. | Approved data-retention policy; preserve current choice during migration. |
 | `CASE_MEDIA_DUAL_WRITE` | No | Default false; updates normalized projection alongside legacy writes. | Approved migration state; preserve rather than infer. |
 | `CASE_MEDIA_NORMALIZED_READ` | No | Default false; enabling requires dual-write and reconciled projection. | Separate data-reconciliation approval, not a routine portability setting. |
 | `MAX_UPLOAD_FILES` | No | Omit/empty means inherited unlimited file count; otherwise integer count. | Approved capacity policy; no assumption that total-byte limits imply a file-count cap. |
-| `MAX_IMAGE_UPLOAD_BYTES` | No | Default33554432 (32MiB) per image. | Reviewed upload policy; omit optional integer rather than blank. |
-| `MAX_CASE_UPLOAD_BYTES` | No | Default268435456 (256MiB) aggregate case. | Reviewed upload policy. |
-| `MAX_IMAGE_PIXELS` | No | Default40000000 pixels per decoded image. | Reviewed decompression/memory policy. |
+| `MAX_IMAGE_UPLOAD_BYTES` | No | Default 33554432 (32 MiB) per image. | Reviewed upload policy; omit optional integer rather than blank. |
+| `MAX_CASE_UPLOAD_BYTES` | No | Default 268435456 (256 MiB) aggregate case. | Reviewed upload policy. |
+| `MAX_IMAGE_PIXELS` | No | Default 40000000 pixels per decoded image. | Reviewed decompression/memory policy. |
 
 ## Email
 | Variable | Classification | Purpose / constraint | Source or recovery |
@@ -77,9 +77,9 @@ replacement. It must not assume that a provider will show an old secret again. N
 | `DEFAULT_REPLY_TO_EMAIL` | No | Optional single email address; empty omits Reply-To. | Approved monitored reply address, or intentionally empty. |
 | `EMAIL_BACKEND` | No | Custom mode only; default console, so not delivery-ready. Resend forces Django SMTP backend. | Use approved backend; preview forces dummy and tests use locmem. |
 | `EMAIL_HOST` | No | Custom SMTP host; ignored by resend mode (smtp.resend.com). | Provider SMTP instructions. |
-| `EMAIL_PORT` | No | Custom default587; resend forced587. | Provider instructions; this code uses STARTTLS, not implicit SSL. |
+| `EMAIL_PORT` | No | Custom default 587; resend forced 587. | Provider instructions; this code uses STARTTLS, not implicit SSL. |
 | `EMAIL_HOST_USER` | Sensitive identifier | Custom SMTP username; resend forced resend. | Provider SMTP instructions/account. |
-| `EMAIL_USE_TLS` | No | Custom default true; resend forced true. | Provider STARTTLS requirement. EMAIL_USE_SSL=false and timeout20s are code constants, not environment inputs. |
+| `EMAIL_USE_TLS` | No | Custom default true; resend forced true. | Provider STARTTLS requirement. EMAIL_USE_SSL=false and timeout 20s are code constants, not environment inputs. |
 
 ## Filesystem and connector
 | Variable | Classification | Purpose / constraint | Source or recovery |
