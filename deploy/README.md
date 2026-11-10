@@ -82,9 +82,10 @@ two connections, not a growing pool. Capacity and reconnection after a database
 restart must be checked for each deployment. An ASGI deployment must disable
 this setting or use its own supported backend pool.
 
-The viewer requests bounded metadata windows (at most 21 URLs), not full-series
-manifests. It warms at most six neighbors per series, prioritizing direction,
-and allows at most two speculative image loads across all series. Retained
+The viewer requests bounded manifest pages (at most 128 URLs) and keeps at most
+256 URL entries per series. The legacy directional interface remains capped
+at 21 URLs. It decodes at most two neighbors of the active series and allows
+at most two speculative image decodes across all series. Retained
 speculative decoded pixels have a shared estimated 64 MiB budget. Current
 visible images, transient decoding and the browser-managed HTTP cache are not
 part of this estimate; it is not a hard limit on browser process memory. Large
@@ -233,3 +234,46 @@ Official references:
 - https://developers.cloudflare.com/tunnel/reference/run-parameters/
 - https://developers.cloudflare.com/tunnel/reference/origin-parameters/
 - https://hub.docker.com/r/cloudflare/cloudflared/tags
+
+## Prepared-series browser cache
+
+The viewer requests URL manifests in pages of at most 128. This is not an object
+LIST/GET on the server and does not change case permissions. Existing two-URL
+and bounded directional requests remain supported. The browser automatically
+prefetches compressed JPEG bytes for up to 24 upcoming slices of the active
+series, independently of the 64 MiB estimated decoded-pixel budget. Only two
+near neighbors are decoded speculatively. Compressed blobs have a shared 96 MiB
+retained-byte budget, up to three concurrent downloads and an 8 MiB per-object
+limit enforced while streaming. In-flight chunks can add up to 24 MiB, and
+browser-managed HTTP cache, decoded visible images and other browser overhead
+are not included. These are not hard limits on browser process memory.
+
+The optional **Preparar serie** button downloads only the selected display-image
+series, in bounded pages, with progress and cancellation. It stops rather than
+evicting already prepared bytes when the shared budget is exhausted. Only one
+preparation runs at a time. The cache lives in the tab, not persistent storage;
+changing series or exceeding budgets can evict it. No image quality is reduced,
+no originals/DICOM are fetched, and no complete-series decoding is requested.
+Preparing a series consumes visitor data and can increase R2 GET operations.
+
+For cross-origin public images, byte prefetch requires a bucket CORS policy
+allowing GET/HEAD from the exact portal HTTPS origin. This is a separately
+approved provider-side deployment prerequisite, not something this PR changes.
+The CSP connect-src allowlist adds only the validated public JPEG custom origin,
+not all image origins or the private DICOM endpoint. Verify CORS on both a cold
+and previously cached URL with the real Origin header after any approved policy
+change. R2 documents that already-cached assets do not gain new CORS headers
+until refreshed. If the approved policy passes on HEAD/origin but fails on a
+cached GET, arrange an explicitly approved purge limited to the JPEG hostname,
+never Purge Everything. This temporarily increases cold reads/Class B while
+cache repopulates. Preserve any prior policy for rollback; restoring it may
+require the same targeted refresh. Never change bucket publicity to fix CORS.
+See https://developers.cloudflare.com/r2/buckets/cors/ .
+Private/signed-origin setups without this permission retain ordinary Image
+navigation; byte preparation reports an incomplete download and must not claim
+the series is ready. CORS is a browser read permission, not authentication.
+
+Browser QA must compare cold and repeated requested-to-visible latency (p50/p95),
+actual displayed cuts under rapid wheel input, preparation time, transferred
+bytes, all three series and budget/cancel/error behavior. Report the network
+model and device; synthetic measurements are not a claim about a visitor's ISP.

@@ -87,7 +87,7 @@ class PublicImageCacheTests(SimpleTestCase):
             with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
                 validate_public_image_origin(value)
 
-    def test_real_settings_allow_public_origin_only_for_images(self):
+    def test_real_settings_allow_public_image_reads_but_not_scripts_or_private_origins(self):
         import json
         import os
         import subprocess
@@ -101,7 +101,9 @@ class PublicImageCacheTests(SimpleTestCase):
         policy = json.loads(result.stdout)
         self.assertIn('https://media.example.test', policy['img-src'])
         self.assertNotIn('https://media.example.test', policy['script-src'])
-        self.assertNotIn('https://media.example.test', policy['connect-src'])
+        self.assertIn('https://media.example.test', policy['connect-src'])
+        self.assertNotIn('https://synthetic.eu.r2.cloudflarestorage.com', policy['connect-src'])
+        self.assertNotIn('https://synthetic-originals.synthetic.eu.r2.cloudflarestorage.com', policy['connect-src'])
         for overrides in ({'R2_DICOM_BUCKET': 'synthetic-images'}, {'MEDIA_STORAGE': 'filesystem'},
                           {'R2_DICOM_BUCKET': ''}):
             with self.subTest(overrides=overrides):

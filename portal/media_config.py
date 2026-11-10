@@ -1,4 +1,4 @@
-"""Validation shared by public-image URLs and the image-only CSP allowlist."""
+"""Validation shared by public-image URLs and the media CSP allowlists."""
 import ipaddress
 import re
 from urllib.parse import urlsplit
