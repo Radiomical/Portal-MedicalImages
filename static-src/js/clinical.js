@@ -169,7 +169,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   };
   const present = async (token, renew = false) => {
     try {
-      if (metadataPending) await metadataPending;
+      if (metadataPending) await metadataPending.catch(() => {});
       if (token !== generation || disposed) return;
       if (renew || !fresh(cache.get(index))) await fetchWindow(index);
       if (token !== generation || disposed) return;

@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const source = fs.readFileSync('static-src/js/clinical.js', 'utf8');
 const settle = async () => { for (let n = 0; n < 45; n++) await Promise.resolve(); };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set()) {
-  const sets = [], calls = [], images = [], held = [];
+function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set(), deferMetadata = false) {
+  const sets = [], calls = [], images = [], held = [], metaHeld = [];
   class Element {
     constructor() { this.events = {}; this.attrs = {}; this.clientHeight = 400; }
     addEventListener(name, callback) { this.events[name] = callback; }
@@ -37,13 +37,14 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
       const before = Number(u.searchParams.get('before'));
       const after = Number(u.searchParams.get('after'));
       calls.push({index, before, after});
+      if (deferMetadata && calls.length === 1) return new Promise(resolve => metaHeld.push(resolve));
       if (fail) return {ok: false};
       const start = Math.max(0, index - before), end = Math.min(total, index + after + 1);
       return {ok: true, json: async () => ({index, total, ttl: 300, images: Array.from({length: end - start}, (_, i) => ({index: start + i, url: `/synthetic/${start+i}.jpg`}))})};
     }
   };
   vm.runInNewContext(source, context);
-  return {calls, images, held, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
+  return {calls, images, held, metaHeld, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
     let prevented = false;
     sets[0]['.series-frame'].events.wheel({deltaY, deltaX: 0, deltaMode: 0, preventDefault: () => { prevented = true; }, ...extra});
     return prevented;
@@ -160,4 +161,13 @@ test('failure of an older in-flight image does not poison the newest target', as
   v.held.shift()(); await settle();
   assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
   assert.equal(v.get('[data-series-status]').textContent, '');
+});
+
+test('a stale metadata failure does not block the newest target retry', async () => {
+  const v = viewer(120, false, false, 1, new Set(), true);
+  v.get('[data-next]').events.click();
+  v.get('[data-next]').events.click();
+  v.metaHeld.shift()({ok: false}); await settle();
+  assert.equal(v.get('[data-current-slice]').src, '/synthetic/2.jpg');
+  assert.equal(v.calls.length, 2);
 });
