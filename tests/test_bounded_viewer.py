@@ -41,7 +41,7 @@ class BoundedViewerTests(TestCase):
         self.assertEqual(len(self.endpoint(index=119).json()['images']), 1)
 
     def test_indices_and_plane_reject_invalid_input(self):
-        for index, status in [('-1', 404), ('120', 404), ('invalid', 400)]:
+        for index, status in [('-1', 404), ('120', 404), (str(2 ** 64), 404), ('invalid', 400)]:
             self.assertEqual(self.endpoint(index=index).status_code, status)
         self.assertEqual(self.client.get(reverse('blog:series_slice', args=[self.post.pk, 'dicom'])).status_code, 404)
 

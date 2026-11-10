@@ -115,7 +115,7 @@ def series_slice(request, blog_id, plane):
         return JsonResponse({'error': 'Invalid slice window.'}, status=400)
     if not 0 <= before <= 16 or not 0 <= after <= 16 or before + after > 20:
         return JsonResponse({'error': 'Slice window exceeds the bounded limit.'}, status=400)
-    if index < 0:
+    if index < 0 or index > 2147483647:
         raise Http404
     start = max(0, index - before)
     stop = index + after + 1
