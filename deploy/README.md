@@ -235,7 +235,7 @@ Official references:
 - https://developers.cloudflare.com/tunnel/reference/origin-parameters/
 - https://hub.docker.com/r/cloudflare/cloudflared/tags
 
-## Prepared-series browser cache
+## Automatic browser image cache
 
 The viewer requests URL manifests in pages of at most 128. This is not an object
 LIST/GET on the server and does not change case permissions. Existing two-URL
@@ -248,13 +248,12 @@ limit enforced while streaming. In-flight chunks can add up to 24 MiB, and
 browser-managed HTTP cache, decoded visible images and other browser overhead
 are not included. These are not hard limits on browser process memory.
 
-The optional **Preparar serie** button downloads only the selected display-image
-series, in bounded pages, with progress and cancellation. It stops rather than
-evicting already prepared bytes when the shared budget is exhausted. Only one
-preparation runs at a time. The cache lives in the tab, not persistent storage;
-changing series or exceeding budgets can evict it. No image quality is reduced,
-no originals/DICOM are fetched, and no complete-series decoding is requested.
-Preparing a series consumes visitor data and can increase R2 GET operations.
+The cache lives in the tab, not persistent storage. Previously viewed and
+prefetched cuts can remain cached until the shared budget evicts them. The
+24-cut target is in the navigation direction, not 24 in both directions or
+24 per inactive series. No manual full-series download is offered. No image
+quality is reduced and no originals/DICOM are fetched. Automatic prefetch
+consumes visitor data and can increase R2 GET operations.
 
 For cross-origin public images, byte prefetch requires a bucket CORS policy
 allowing GET/HEAD from the exact portal HTTPS origin. This is a separately
@@ -270,10 +269,10 @@ cache repopulates. Preserve any prior policy for rollback; restoring it may
 require the same targeted refresh. Never change bucket publicity to fix CORS.
 See https://developers.cloudflare.com/r2/buckets/cors/ .
 Private/signed-origin setups without this permission retain ordinary Image
-navigation; byte preparation reports an incomplete download and must not claim
-the series is ready. CORS is a browser read permission, not authentication.
+navigation when byte prefetch is unavailable. CORS is a browser read permission,
+not authentication.
 
 Browser QA must compare cold and repeated requested-to-visible latency (p50/p95),
-actual displayed cuts under rapid wheel input, preparation time, transferred
-bytes, all three series and budget/cancel/error behavior. Report the network
+actual displayed cuts under rapid wheel input, transferred bytes, all three
+series and budget/abort/error behavior. Report the network
 model and device; synthetic measurements are not a claim about a visitor's ISP.

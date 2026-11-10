@@ -3,7 +3,6 @@
 <div class="series-frame" tabindex="0" aria-label="{{ series_name }} - imágenes. Usa la rueda del ratón o las flechas izquierda y derecha para cambiar de corte."><img alt="{{ series_name }} - corte 1 de {{ images }}" data-current-slice hidden></div>
 <p data-series-status role="status">Cargando imagen…</p>
 <div class="series-controls" hidden><button type="button" data-previous aria-label="Corte anterior: {{ series_name }}">←</button><label class="sr-only" for="slice-{{ series_id }}">Corte: {{ series_name }}</label><input id="slice-{{ series_id }}" type="range" min="1" max="{{ images }}" value="1" step="1"><output aria-live="polite">1 / {{ images }}</output><button type="button" data-next aria-label="Corte siguiente: {{ series_name }}">→</button></div>
-<div class="series-prepare"><button type="button" data-prepare-series>Preparar serie</button><button type="button" data-cancel-prepare hidden>Cancelar</button><p data-prepare-status role="status">Opcional: descarga JPEG de esta serie, hasta 96 MiB, sin reducir calidad. Consume datos.</p></div>
 <noscript>Se necesita JavaScript para cargar esta serie de imágenes de forma limitada.</noscript>
 {% if description %}<details class="series-description"><summary>Descripción de la serie</summary><p>{{ description|linebreaksbr }}</p></details>{% endif %}
 </section>
