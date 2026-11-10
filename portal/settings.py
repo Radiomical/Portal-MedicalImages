@@ -57,6 +57,17 @@ elif DB_ENGINE == "postgresql":
     DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "NAME": os.environ.get("DATABASE_NAME", ""), "USER": os.environ.get("DATABASE_USER", ""), "PASSWORD": os.environ.get("DATABASE_PASSWORD", ""), "HOST": os.environ.get("DATABASE_HOST", ""), "PORT": os.environ.get("DATABASE_PORT", "5432"), "OPTIONS": {"sslmode": os.environ.get("DATABASE_SSLMODE", "require")}}}
 else:
     raise ImproperlyConfigured("DB_ENGINE must be postgresql or sqlite")
+# Gunicorn WSGI: reuse a bounded number of connections, never unlimited age.
+# ASGI deployments must set this to 0 or use a supported backend pool instead.
+try:
+    DATABASE_CONN_MAX_AGE = int(os.environ.get("DATABASE_CONN_MAX_AGE", "60"))
+except ValueError as exc:
+    raise ImproperlyConfigured("DATABASE_CONN_MAX_AGE must be an integer") from exc
+if not 0 <= DATABASE_CONN_MAX_AGE <= 60:
+    raise ImproperlyConfigured("DATABASE_CONN_MAX_AGE must be between 0 and 60 seconds")
+if DB_ENGINE == "postgresql":
+    DATABASES['default']['CONN_MAX_AGE'] = DATABASE_CONN_MAX_AGE
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 AUTH_PASSWORD_VALIDATORS = [{"NAME": "django.contrib.auth.password_validation." + name} for name in ["UserAttributeSimilarityValidator", "MinimumLengthValidator", "CommonPasswordValidator", "NumericPasswordValidator"]]
 LANGUAGE_CODE = "es"
 TIME_ZONE = "UTC"

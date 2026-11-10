@@ -63,3 +63,27 @@ class BoundedViewerTests(TestCase):
         rows.filter(pk=rows.last().pk).update(axial_description='Synthetic valid description')
         response = self.client.get(reverse('blog:blog_page', args=[self.post.title, self.post.pk]))
         self.assertEqual(response.context['axial_description'], 'Synthetic valid description')
+
+    def test_adaptive_windows_are_bounded_in_both_directions(self):
+        for before, after in [(4, 16), (16, 4)]:
+            with patch('blog.views.default_storage.url', side_effect=lambda key: '/fixture/' + key) as url:
+                response = self.endpoint(index=50, before=before, after=after)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([item['index'] for item in response.json()['images']], list(range(50 - before, 51 + after)))
+            self.assertEqual(url.call_count, 21)
+
+    def test_legacy_batch_is_one_query_and_never_reads_objects(self):
+        with patch('blog.views.default_storage.url', return_value='/fixture/image.jpg'), CaptureQueriesContext(connection) as queries:
+            response = self.endpoint(index=50, before=4, after=16)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(queries), 1)
+        self.assertIn('OVER', queries[0]['sql'])
+
+    def test_window_edges_and_missing_case_do_not_leak_other_rows(self):
+        self.assertEqual([item['index'] for item in self.endpoint(index=0, before=4, after=16).json()['images']], list(range(17)))
+        self.assertEqual([item['index'] for item in self.endpoint(index=119, before=16, after=4).json()['images']], list(range(103, 120)))
+        self.assertEqual(self.client.get(reverse('blog:series_slice', args=[999999, 'axial']), {'index': 0}).status_code, 404)
+
+    def test_unbounded_or_malformed_windows_are_rejected(self):
+        for before, after in [(-1, 1), (4, 17), (17, 4), (16, 16), ('invalid', 1)]:
+            self.assertEqual(self.endpoint(index=50, before=before, after=after).status_code, 400)

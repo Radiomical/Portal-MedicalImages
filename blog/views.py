@@ -100,19 +100,26 @@ def retrieve_first_post_image(posts):
 @require_GET
 @never_cache
 def series_slice(request, blog_id, plane):
-    """Preserve the current case audience; callers cannot supply an object key.
+    """Bounded URLs only: no object GET/LIST, and no change to case audience.
 
-    R2 signing is local. A response authorizes only the requested image and one
-    adjacent prefetch. It does not fetch the objects or list the R2 bucket.
+    Defaults preserve the two-image response. Adaptive clients may request up to
+    16 in either direction, with at most 21 total; callers cannot supply object keys or request a stack.
     """
     if plane not in ('axial', 'coronal', 'sagital'):
         raise Http404
-    post = get_object_or_404(Post, pk=blog_id)
     try:
         index = int(request.GET.get('index', '0'))
+        before = int(request.GET.get('before', '0'))
+        after = int(request.GET.get('after', '1'))
     except (TypeError, ValueError):
-        return JsonResponse({'error': 'Invalid slice index.'}, status=400)
-    normalized = normalized_case(post.pk)
+        return JsonResponse({'error': 'Invalid slice window.'}, status=400)
+    if not 0 <= before <= 16 or not 0 <= after <= 16 or before + after > 20:
+        return JsonResponse({'error': 'Slice window exceeds the bounded limit.'}, status=400)
+    if index < 0:
+        raise Http404
+    start = max(0, index - before)
+    stop = index + after + 1
+    normalized = normalized_case(blog_id)
     if normalized is not None:
         from users.models import Image
         from django.db.models import Count, Min, Max
@@ -125,23 +132,30 @@ def series_slice(request, blog_id, plane):
         expected = series.expected_image_count
         if expected is None or total != expected or (total and (stats['first'] != 0 or stats['last'] != total - 1)):
             return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
-        if index < 0 or index >= total:
+        if index >= total:
             raise Http404
-        keys = list(rows.filter(position__gte=index, position__lt=index + 2).order_by('position').values_list('object_key', flat=True))
-        if len(keys) != min(2, total - index):
-            # A projection with gaps is corrupt, not permission to shift slices.
+        keys = list(rows.filter(position__gte=start, position__lt=stop).order_by('position').values_list('object_key', flat=True))
+        if len(keys) != min(stop, total) - start:
             return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
     else:
+        from django.db.models import Count, Window
         field = plane + '_images'
-        rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
-        total = rows.count()
-        if index < 0 or index >= total:
+        # COUNT OVER is evaluated before LIMIT/OFFSET: total and bounded keys in
+        # one DB round trip. The FK already ties every returned row to this case.
+        rows = (FilePost.objects.filter(post_id=blog_id)
+                .exclude(**{field: None}).exclude(**{field: ''})
+                .annotate(series_total=Window(expression=Count('pk'))).order_by('pk'))
+        batch = list(rows.values_list(field, 'series_total')[start:stop])
+        if not batch:
             raise Http404
-        keys = list(rows.values_list(field, flat=True)[index:index + 2])
-    from django.conf import settings
+        total = batch[0][1]
+        if index >= total:
+            raise Http404
+        keys = [key for key, _ in batch]
     ttl = settings.R2_SIGNED_URL_SECONDS if settings.MEDIA_STORAGE == 'r2' else 300
     return JsonResponse({'index': index, 'total': total, 'ttl': ttl,
-                         'images': [{'index': index + offset, 'url': default_storage.url(key)} for offset, key in enumerate(keys)]})
+                         'images': [{'index': start + offset, 'url': default_storage.url(key)} for offset, key in enumerate(keys)]})
+
 
 
 def search(request):

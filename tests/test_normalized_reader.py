@@ -83,3 +83,14 @@ class NormalizedReaderTests(TestCase):
                 for index in (0, 65, 119):
                     self.assertEqual(self.endpoint(index).status_code, 503)
                 Image.objects.create(**data)
+
+    @override_settings(CASE_MEDIA_DUAL_WRITE=True, CASE_MEDIA_NORMALIZED_READ=True)
+    def test_adaptive_batch_matches_legacy_and_preserves_gap_guard(self):
+        url = reverse('blog:series_slice', args=[self.post.pk, 'axial'])
+        for before, after in [(4, 16), (16, 4)]:
+            params = {'index': 50, 'before': before, 'after': after}
+            with override_settings(CASE_MEDIA_NORMALIZED_READ=False):
+                legacy = self.client.get(url, params).json()
+            self.assertEqual(self.client.get(url, params).json(), legacy)
+        Image.objects.filter(series__case_id=self.post.pk, series__plane='axial', position=60).delete()
+        self.assertEqual(self.client.get(url, {'index': 50, 'before': 4, 'after': 16}).status_code, 503)
