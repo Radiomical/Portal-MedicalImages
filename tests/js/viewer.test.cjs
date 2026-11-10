@@ -17,7 +17,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     get src() { return this.attrs.src; }
   }
   const series = Array.from({length: planes}, (_, plane) => {
-    const selectors = Object.fromEntries(['.series-controls', 'input', 'output', '[data-previous]', '[data-next]', '.series-frame', '[data-current-slice]', '[data-series-status]'].map(k => [k, new Element()]));
+    const selectors = Object.fromEntries(['.series-controls', 'input', 'output', '[data-previous]', '[data-next]', '.series-frame', '[data-current-slice]', '[data-series-status]', '[data-prepare-series]', '[data-cancel-prepare]', '[data-prepare-status]'].map(k => [k, new Element()]));
     selectors['.series-controls'].querySelector = k => selectors[k];
     sets.push(selectors);
     return {dataset: {count: String(total), endpoint: `/synthetic/${plane}/slices/`}, querySelector: k => selectors[k], getAttribute: () => 'Synthetic series'};
@@ -249,4 +249,21 @@ test('clearing compressed bytes aborts pending work without disabling the origin
   await assert.rejects(pending,/Cancelled/);assert.equal(pool.disabled.size,0);assert.equal(pool.bytes,0);
   const next=pool.download('/two.jpg',signal);finish(byteResponse());await next;
   assert.equal(pool.bytes,32);assert.equal(pool.active,0);
+});
+test('preparation resets an old ready/error label before starting a new attempt', async () => {
+  const v=viewer(2);await settle();v.get('[data-prepare-status]').textContent='Serie descargada';
+  const task=v.get('[data-prepare-series]').events.click();
+  assert.match(v.get('[data-prepare-status]').textContent,/Preparando 0/);
+  await task;assert.match(v.get('[data-prepare-status]').textContent,/incompleta/);
+  v.get('[data-next]').events.click();await settle();assert.equal(v.get('output').value,'2 / 2');
+});
+test('byte transport admits at most three concurrent streaming downloads', async () => {
+  const pending=[];const pool=bytePool(async () => new Promise(resolve=>pending.push(resolve)));const signal=new AbortController().signal;
+  const a=pool.download('/a.jpg',signal),b=pool.download('/b.jpg',signal),c=pool.download('/c.jpg',signal);
+  assert.equal(pool.active,3);assert.equal(await pool.download('/d.jpg',signal),null);
+  for(const resolve of pending)resolve(byteResponse());await Promise.all([a,b,c]);assert.equal(pool.active,0);
+});
+test('streaming limit is enforced even without Content-Length', async () => {
+  const pool=bytePool(async () => {const response=byteResponse(48);response.headers.delete('Content-Length');return response;});pool.objectLimit=32;
+  await assert.rejects(pool.download('/huge.jpg',new AbortController().signal),/limit/);assert.equal(pool.bytes,0);assert.equal(pool.active,0);
 });

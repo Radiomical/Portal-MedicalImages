@@ -269,6 +269,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     seriesBytes.clear();
     prepareButton.disabled = true; cancelButton.hidden = false;
     let complete = 0;
+    prepareStatus.textContent = `Preparando 0 / ${total}…`;
     try {
       for (let start = 0; start < total; start += 128) {
         manifestAbort = new AbortController();
