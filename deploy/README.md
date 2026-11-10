@@ -20,6 +20,10 @@ No Docker socket, host networking, privileged mode or production media volume
 is needed. The image is nonroot, read-only and capability-free at runtime.
 The Compose healthcheck checks a local socket only, not database health.
 
+The [configuration reference](CONFIGURATION.md) lists every supported variable,
+its purpose, classification and provider recovery route, including external
+state and private installation-inventory requirements. It contains no values.
+
 ## Prerequisites and private configuration
 
 Docker Engine and Compose v2 must be available on the target Linux VM. Network
