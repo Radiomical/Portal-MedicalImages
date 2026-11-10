@@ -8,14 +8,14 @@ const viewerBudget = {bytes: 0, active: 0, waiters: new Set(), limit: 64 * 1024 
 const seriesBytes = {
   limit: 96 * 1024 * 1024, objectLimit: 8 * 1024 * 1024, bytes: 0,
   active: 0, entries: new Map(), pending: new Map(), activeSeries: null,
-  preparing: null, disabled: new Set(),
+  disabled: new Set(),
   get(url) {
     const value = this.entries.get(url);
     if (value) { this.entries.delete(url); this.entries.set(url, value); }
     return value;
   },
   clear() { this.entries.clear(); this.bytes = 0; for (const item of this.pending.values()) item.abort(); },
-  async download(url, signal, retainAll = false) {
+  async download(url, signal) {
     if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
     const cached = this.get(url);
     if (cached) return cached;
@@ -46,7 +46,6 @@ const seriesBytes = {
       } finally { await reader.cancel().catch(() => {}); }
       if (signal.aborted || abort.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
       if (!size) throw new Error('Empty image response');
-      if (retainAll && this.bytes + size > this.limit) throw new Error('Series exceeds download budget');
       while (this.bytes + size > this.limit && this.entries.size) {
         const oldest = this.entries.keys().next().value;
         this.bytes -= this.entries.get(oldest).size; this.entries.delete(oldest);
@@ -76,15 +75,11 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const frame = series.querySelector(".series-frame");
   const image = series.querySelector("[data-current-slice]");
   const status = series.querySelector("[data-series-status]");
-  const prepareButton = series.querySelector('[data-prepare-series]');
-  const cancelButton = series.querySelector('[data-cancel-prepare]');
-  const prepareStatus = series.querySelector('[data-prepare-status]');
   const total = Number(series.dataset.count);
   if (!Number.isSafeInteger(total) || total < 1) return;
   const cache = new Map();
   if (!seriesBytes.activeSeries) seriesBytes.activeSeries = series;
-  let downloads = new AbortController(), preparation, byteTimer;
-  let manifestAbort;
+  let downloads = new AbortController(), byteTimer;
   let index = 0, displayed = -1, generation = 0, direction = 1;
   let lastMove = 0, fastUntil = 0, metadataPending, foregroundPending;
   let idleTimer, pumpTimer, disposed = false;
@@ -237,7 +232,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   };
   const scheduleBytes = () => {
     clearTimeout(byteTimer);
-    if (disposed || preparation || seriesBytes.preparing || seriesBytes.activeSeries !== series) return;
+    if (disposed || seriesBytes.activeSeries !== series) return;
     byteTimer = setTimeout(async () => {
       const candidates = [];
       for (let n = 1; n <= 24; n++) {
@@ -253,69 +248,6 @@ document.querySelectorAll("[data-series]").forEach((series) => {
           !seriesBytes.disabled.size) scheduleBytes();
     }, 50);
   };
-  const prepareSeries = async () => {
-    if (seriesBytes.preparing || preparation) {
-      prepareStatus.textContent = 'Otra preparación está en curso. Cancélala o espera a que termine.';
-      return;
-    }
-    preparation = new AbortController();
-    const job = preparation;
-    seriesBytes.preparing = job;
-    seriesBytes.activeSeries = series;
-    downloads.abort(); downloads = new AbortController();
-    clearTimeout(byteTimer);
-    // Preparation is explicitly one selected series, up to the global byte
-    // budget. It never downloads private DICOM or changes an object.
-    seriesBytes.clear();
-    prepareButton.disabled = true; cancelButton.hidden = false;
-    let complete = 0;
-    prepareStatus.textContent = `Preparando 0 / ${total}…`;
-    try {
-      for (let start = 0; start < total; start += 128) {
-        manifestAbort = new AbortController();
-        const abortPage = () => manifestAbort.abort();
-        job.signal.addEventListener('abort', abortPage, {once: true});
-        const timer = setTimeout(abortPage, 8000);
-        let data;
-        try {
-          const response = await fetch(`${series.dataset.endpoint}?index=${start}&count=128`, {
-            signal: manifestAbort.signal, credentials: 'same-origin', cache: 'no-store'
-          });
-          if (!response.ok) throw new Error('Manifest unavailable');
-          data = await response.json();
-        } finally { clearTimeout(timer); job.signal.removeEventListener('abort', abortPage); }
-        if (data.index !== start || data.total !== total || !Array.isArray(data.images) ||
-            data.images.length !== Math.min(128, total - start) ||
-            data.images.some((item, offset) => item.index !== start + offset || typeof item.url !== 'string' || !item.url)) {
-          throw new Error('Invalid manifest page');
-        }
-        for (let offset = 0; offset < data.images.length; offset += 3) {
-          await Promise.all(data.images.slice(offset, offset + 3).map(async item => {
-            if (job.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-            let blob;
-            while (!blob) {
-              blob = await seriesBytes.download(item.url, job.signal, true);
-              if (!blob) await new Promise(resolve => setTimeout(resolve, 30));
-            }
-            if (job.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-            complete++;
-            prepareStatus.textContent = `Descargados ${complete} / ${total}; ${(seriesBytes.bytes / 1048576).toFixed(1)} / 96 MiB.`;
-          }));
-        }
-      }
-      prepareStatus.textContent = `Serie descargada: ${complete} cortes. Conservada en esta pestaña hasta salir, preparar otra serie o superar el presupuesto.`;
-    } catch (error) {
-      prepareStatus.textContent = job.signal.aborted ? `Preparación cancelada: ${complete} / ${total}.` :
-        `Preparación incompleta: ${complete} / ${total}. Límite de 96 MiB, archivo de 8 MiB, red o permiso de descarga. El visor normal sigue disponible.`;
-    } finally {
-      job.abort();
-      if (preparation === job) preparation = null;
-      if (seriesBytes.preparing === job) seriesBytes.preparing = null;
-      prepareButton.disabled = false; cancelButton.hidden = true;
-    }
-  };
-  prepareButton?.addEventListener('click', prepareSeries);
-  cancelButton?.addEventListener('click', () => preparation?.abort());
   const refill = () => {
     clearTimeout(idleTimer);
     if (disposed) return;
@@ -425,7 +357,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   });
   window.addEventListener("pagehide", () => {
     disposed = true;
-    downloads.abort(); preparation?.abort(); manifestAbort?.abort();
+    downloads.abort();
     clearTimeout(byteTimer);
     seriesBytes.clear();
     viewerBudget.waiters.delete(schedulePump);

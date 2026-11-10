@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const source = fs.readFileSync('static-src/js/clinical.js', 'utf8');
 const settle = async () => { for (let n = 0; n < 45; n++) await Promise.resolve(); };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set(), deferMetadata = false, fastTimeout = false) {
-  const sets = [], calls = [], images = [], held = [], metaHeld = [], windowEvents = {};
+function viewer(total = 120, fail = false, holdImages = false, planes = 1, failures = new Set(), deferMetadata = false, fastTimeout = false, byteSuccess = false) {
+  const sets = [], calls = [], images = [], held = [], metaHeld = [], windowEvents = {}, byteCalls = [];
   class Element {
     constructor() { this.events = {}; this.attrs = {}; this.clientHeight = 400; }
     addEventListener(name, callback) { this.events[name] = callback; }
@@ -17,7 +17,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     get src() { return this.attrs.src; }
   }
   const series = Array.from({length: planes}, (_, plane) => {
-    const selectors = Object.fromEntries(['.series-controls', 'input', 'output', '[data-previous]', '[data-next]', '.series-frame', '[data-current-slice]', '[data-series-status]', '[data-prepare-series]', '[data-cancel-prepare]', '[data-prepare-status]'].map(k => [k, new Element()]));
+    const selectors = Object.fromEntries(['.series-controls', 'input', 'output', '[data-previous]', '[data-next]', '.series-frame', '[data-current-slice]', '[data-series-status]'].map(k => [k, new Element()]));
     selectors['.series-controls'].querySelector = k => selectors[k];
     sets.push(selectors);
     return {dataset: {count: String(total), endpoint: `/synthetic/${plane}/slices/`}, querySelector: k => selectors[k], getAttribute: () => 'Synthetic series'};
@@ -38,7 +38,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
       const before = Number(u.searchParams.get('before'));
       const after = Number(u.searchParams.get('after'));
       const count = Number(u.searchParams.get('count'));
-      if (u.pathname.endsWith('.jpg')) return {ok: false};
+      if (u.pathname.endsWith('.jpg')) { byteCalls.push(u.pathname); return byteSuccess ? byteResponse() : {ok: false}; }
       calls.push(count ? {index, count} : {index, before, after});
       if (deferMetadata && calls.length === 1) return new Promise(resolve => metaHeld.push(resolve));
       if (fail) return {ok: false};
@@ -47,7 +47,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     }
   };
   vm.runInNewContext(source, context);
-  return {calls, images, held, metaHeld, windowEvents, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
+  return {calls, byteCalls, images, held, metaHeld, windowEvents, context, get: (k, plane = 0) => sets[plane][k], budget: () => vm.runInNewContext('viewerBudget', context), wheel: (deltaY, extra = {}) => {
     let prevented = false;
     sets[0]['.series-frame'].events.wheel({deltaY, deltaX: 0, deltaMode: 0, preventDefault: () => { prevented = true; }, ...extra});
     return prevented;
@@ -214,12 +214,10 @@ test('compressed cache downloads bytes without constructing or decoding Images',
   await pool.download('/image.jpg', signal);assert.equal(calls, 1);
   pool.clear();assert.equal(pool.bytes, 0);
 });
-test('compressed cache caps objects, total bytes and explicit preparation without eviction', async () => {
+test('compressed cache caps objects and total bytes with bounded eviction', async () => {
   const pool = bytePool(async () => byteResponse(40));pool.limit=64;pool.objectLimit=48;
   const signal = new AbortController().signal;
   await pool.download('/one.jpg', signal);
-  await assert.rejects(pool.download('/two.jpg', signal, true), /budget/);
-  assert.equal(pool.bytes, 40);assert.ok(pool.get('/one.jpg'));
   await pool.download('/two.jpg', signal);assert.equal(pool.get('/one.jpg'), undefined);assert.equal(pool.bytes, 40);
   pool.objectLimit=16;await assert.rejects(pool.download('/huge.jpg', signal), /limit/);
   assert.equal(pool.active, 0);assert.equal(pool.bytes, 40);
@@ -250,13 +248,6 @@ test('clearing compressed bytes aborts pending work without disabling the origin
   const next=pool.download('/two.jpg',signal);finish(byteResponse());await next;
   assert.equal(pool.bytes,32);assert.equal(pool.active,0);
 });
-test('preparation resets an old ready/error label before starting a new attempt', async () => {
-  const v=viewer(2);await settle();v.get('[data-prepare-status]').textContent='Serie descargada';
-  const task=v.get('[data-prepare-series]').events.click();
-  assert.match(v.get('[data-prepare-status]').textContent,/Preparando 0/);
-  await task;assert.match(v.get('[data-prepare-status]').textContent,/incompleta/);
-  v.get('[data-next]').events.click();await settle();assert.equal(v.get('output').value,'2 / 2');
-});
 test('byte transport admits at most three concurrent streaming downloads', async () => {
   const pending=[];const pool=bytePool(async () => new Promise(resolve=>pending.push(resolve)));const signal=new AbortController().signal;
   const a=pool.download('/a.jpg',signal),b=pool.download('/b.jpg',signal),c=pool.download('/c.jpg',signal);
@@ -266,4 +257,30 @@ test('byte transport admits at most three concurrent streaming downloads', async
 test('streaming limit is enforced even without Content-Length', async () => {
   const pool=bytePool(async () => {const response=byteResponse(48);response.headers.delete('Content-Length');return response;});pool.objectLimit=32;
   await assert.rejects(pool.download('/huge.jpg',new AbortController().signal),/limit/);assert.equal(pool.bytes,0);assert.equal(pool.active,0);
+});
+
+test('series template has no manual preparation UI or event handlers', () => {
+  const template=fs.readFileSync('blog/templates/blog/_series.html','utf8');
+  assert.doesNotMatch(template,/data-prepare|data-cancel-prepare|series-prepare/);
+  assert.doesNotMatch(source,/prepareSeries|prepareButton|prepareStatus|cancelButton/);
+});
+test('automatic byte prefetch still warms 24 upcoming cuts without a button', async () => {
+  const v=viewer(120,false,false,1,new Set(),false,false,true);await settle();
+  await sleep(650);await settle();
+  assert.equal(v.byteCalls.length,24);
+  assert.deepEqual(v.byteCalls.map(u=>Number(u.match(/(\d+)\.jpg/)[1])).sort((a,b)=>a-b),Array.from({length:24},(_,i)=>i+1));
+  assert.equal(v.get('output').value,'1 / 120');
+  assert.equal(vm.runInNewContext('seriesBytes.bytes',v.context),24*32);
+  v.windowEvents.pagehide({persisted:false});
+});
+test('automatic byte prefetch follows reversal rather than fetching both directions', async () => {
+  const v=viewer(120,false,false,1,new Set(),false,false,true);await settle();
+  v.get('input').value='51';v.get('input').events.input();await sleep(800);await settle();
+  assert.ok(v.byteCalls.includes('/synthetic/74.jpg'));
+  assert.ok(!v.byteCalls.includes('/synthetic/26.jpg'));
+  v.get('[data-previous]').events.click();await settle();await sleep(800);await settle();
+  assert.ok(v.byteCalls.includes('/synthetic/25.jpg'));
+  assert.equal(v.get('output').value,'50 / 120');
+  assert.ok(v.budget().bytes<=64*1024*1024);
+  v.windowEvents.pagehide({persisted:false});
 });

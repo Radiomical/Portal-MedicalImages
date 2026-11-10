@@ -17,7 +17,7 @@ async def main():
  results={}
  async with async_playwright() as p:
   browser=await p.chromium.launch(executable_path=os.environ.get('CHROME_EXECUTABLE') or shutil.which('google-chrome'),headless=True,args=['--no-sandbox'])
-  for mode in ['baseline','candidate','prepared']:
+  for mode in ['baseline','candidate']:
    ctx=await browser.new_context(viewport={'width':1200,'height':960});page=await ctx.new_page();counts={'metadata':0,'jpeg':0,'wire_bytes':0,'active':0,'max_active':0};cache=set();lat=[]
    async def route(r):
     u=urlparse(r.request.url);path=u.path
@@ -33,9 +33,6 @@ async def main():
      await r.fulfill(content_type='text/html',body=html)
    await page.route('**/*',route);await page.goto('https://synthetic.test');await page.wait_for_function("[...document.querySelectorAll('output')].every(e=>e.value==='1 / 80')")
    await page.wait_for_timeout(600)
-   prep_ms=None
-   if mode=='prepared':
-    t=time.perf_counter();await page.locator('[data-prepare-series]').first.click();await page.wait_for_function("document.querySelector('[data-prepare-status]').textContent.includes('Descargados')");await page.screenshot(path=str(out/'preparing-desktop.png'));await page.wait_for_function("document.querySelector('[data-prepare-status]').textContent.includes('Serie descargada')",timeout=45000);prep_ms=round((time.perf_counter()-t)*1000)
    for phase in ['first_pass','return_pass']:
     samples=[]
     for target in (range(1,25) if phase=='first_pass' else range(23,-1,-1)):
@@ -49,9 +46,9 @@ async def main():
    await page.wait_for_function("document.querySelector('output').value==='21 / 80'",timeout=12000)
    wheel={'final_lag_ms':round((time.perf_counter()-end)*1000),'distinct_displayed_cuts':await page.evaluate('window.running=false;new Set(window.visibleCuts).size'),'ticks':20,'tick_interval_ms':60}
    state=await page.evaluate("({decoded:viewerBudget.bytes,compressed:typeof seriesBytes==='undefined'?null:seriesBytes.bytes,active:typeof seriesBytes==='undefined'?null:seriesBytes.active,originsDisabled:typeof seriesBytes==='undefined'?null:[...seriesBytes.disabled]})")
-   if mode=='prepared':
-    await page.screenshot(path=str(out/'prepared-desktop.png'));await page.set_viewport_size({'width':390,'height':844});await page.screenshot(path=str(out/'prepared-mobile.png'));assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-   results[mode]={'latency':lat,'prepare_ms':prep_ms,'wheel':wheel,'counts':counts.copy(),'budget':state,'jpeg_bytes':len(jpeg),'dimensions':[2100,2420],'network_model':'225ms metadata,400ms cold JPEG,100ms repeat JPEG; routing fixture disables true browser HTTP cache, compressed blobs retained in candidate only','series':3,'slices_per_series':80}
+   if mode=='candidate':
+    await page.screenshot(path=str(out/'automatic-desktop.png'));await page.set_viewport_size({'width':390,'height':844});await page.screenshot(path=str(out/'automatic-mobile.png'));assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+   results[mode]={'latency':lat,'wheel':wheel,'counts':counts.copy(),'budget':state,'jpeg_bytes':len(jpeg),'dimensions':[2100,2420],'network_model':'225ms metadata,400ms cold JPEG,100ms repeat JPEG; routing fixture disables true browser HTTP cache, compressed blobs retained in candidate only','series':3,'slices_per_series':80}
    print(mode,json.dumps(results[mode]),flush=True);await page.unroute_all(behavior='wait');await ctx.close()
   await browser.close()
  (out/'benchmark.json').write_text(json.dumps(results,indent=2))

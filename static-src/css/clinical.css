@@ -45,9 +45,3 @@ body.clinical{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 In
 .cookie-notice h1{margin-bottom:1.5rem}
 .cookie-notice h3{margin-top:1.75rem}
 .cookie-notice p{margin:.9rem 0}
-/* Optional byte preparation is separate from requested/visible slice status. */
-.series-prepare{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 1rem}
-.series-prepare p{flex-basis:100%;font-size:.85rem;margin:0;overflow-wrap:anywhere}
-.series-prepare button{min-height:44px;max-width:100%;white-space:normal}
-.series-prepare button{border:1px solid #31564d;background:#153d34;color:#def5e9;padding:.55rem .8rem;border-radius:.6rem;font:inherit;cursor:pointer}
-.series-prepare button:disabled{opacity:.55;cursor:wait}
