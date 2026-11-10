@@ -1,5 +1,8 @@
 "use strict";
-// Keep a small sliding window, never an entire stack of signed URLs or images.
+// Metadata: <=21 URLs per series. Decoded speculation: <=64 MiB estimated across
+// all series, <=2 concurrent speculative images. Visible images/browser HTTP
+// cache are outside this estimate; the browser controls their actual allocation.
+const viewerBudget = {bytes: 0, active: 0, waiters: new Set(), limit: 64 * 1024 * 1024};
 document.querySelectorAll("[data-series]").forEach((series) => {
   const controls = series.querySelector(".series-controls");
   const range = controls.querySelector("input");
@@ -11,125 +14,230 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const status = series.querySelector("[data-series-status]");
   const total = Number(series.dataset.count);
   if (!Number.isSafeInteger(total) || total < 1) return;
-  let index = 0;
-  let generation = 0;
-  let controller;
-  let warming;
-  let renewalAttempted = false;
   const cache = new Map();
+  let index = 0, displayed = -1, generation = 0, direction = 1;
+  let lastMove = 0, fastUntil = 0, metadataPending, foregroundPending;
+  let idleTimer, pumpTimer, disposed = false;
+  let imageBytes = 4 * 1024 * 1024;
   const fresh = (entry) => entry && entry.expires > Date.now() + 10000;
+  const windowSize = () => Date.now() < fastUntil ? 16 : 8;
+  const bounds = () => direction > 0 ? [Math.max(0, index - 4), Math.min(total - 1, index + windowSize())] :
+    [Math.max(0, index - windowSize()), Math.min(total - 1, index + 4)];
+  const release = (entry) => {
+    if (entry.reserved) viewerBudget.bytes -= entry.reserved;
+    entry.reserved = 0;
+    entry.decoded = null;
+  };
   const prune = () => {
+    const [low, high] = bounds();
     for (const [key, entry] of cache) {
-      if (key < index - 1 || key > index + 3 || !fresh(entry)) cache.delete(key);
-    }
-  };
-  const remember = (data, requested) => {
-    if (data.index !== requested || !Array.isArray(data.images) ||
-        !data.images.length || data.images.length > 2 ||
-        !Number.isFinite(data.ttl) || data.ttl <= 0 ||
-        data.images.some((item, offset) => item.index !== requested + offset ||
-          item.index >= total || typeof item.url !== "string" || !item.url)) {
-      throw new Error("Invalid image response");
-    }
-    data.images.forEach((item) => {
-      const old = cache.get(item.index);
-      if (fresh(old) && old.url === item.url) return;
-      cache.set(item.index, {url: item.url, expires: Date.now() + data.ttl * 1000});
-    });
-    prune();
-  };
-  const request = async (requested, signal) => {
-    const response = await fetch(`${series.dataset.endpoint}?index=${requested}`, {
-      signal, credentials: "same-origin", cache: "no-store"
-    });
-    if (!response.ok) throw new Error("Image unavailable");
-    return response.json();
-  };
-  const warmImage = (entry) => {
-    if (!fresh(entry) || entry.preload) return;
-    const preload = new Image();
-    entry.preload = preload;
-    preload.onload = () => { entry.loaded = true; };
-    preload.onerror = () => { entry.preload = null; entry.loaded = false; };
-    preload.src = entry.url;
-  };
-  const warmWindow = async () => {
-    // One background metadata request at a time. Refill on cached transitions too.
-    if (warming) return;
-    const token = generation;
-    const background = new AbortController();
-    warming = background;
-    try {
-      const start = index;
-      for (let target = start + 1; target <= Math.min(total - 1, start + 3); target++) {
-        if (token !== generation) return;
-        if (!fresh(cache.get(target))) {
-          const data = await request(target, background.signal);
-          if (token !== generation) return;
-          remember(data, target);
-        }
-        warmImage(cache.get(target));
+      if (key < low || key > high || !fresh(entry)) {
+        release(entry);
+        cache.delete(key);
       }
-      warmImage(cache.get(index - 1));
-    } catch (error) {
-      // A speculative failure must not hide the current image or block navigation.
-    } finally {
-      if (warming === background) warming = null;
+    }
+    // Any former visible image retained for reuse must rejoin the budget.
+    for (const [key, entry] of cache) {
+      if (key !== displayed && entry.decoded && !entry.reserved) {
+        const bytes = entry.decoded.naturalWidth * entry.decoded.naturalHeight * 4;
+        if (viewerBudget.bytes + bytes <= viewerBudget.limit) {
+          entry.reserved = bytes;
+          viewerBudget.bytes += bytes;
+        } else release(entry);
+      }
+    }
+    // Visible/current images do not consume the speculative budget.
+    const visible = cache.get(displayed);
+    if (visible?.reserved) { viewerBudget.bytes -= visible.reserved; visible.reserved = 0; }
+  };
+  const fetchWindow = async (target) => {
+    if (metadataPending) return metadataPending;
+    const ahead = windowSize();
+    const before = direction > 0 ? 4 : ahead;
+    const after = direction > 0 ? ahead : 4;
+    const start = Math.max(0, target - before);
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 8000);
+    const task = (async () => {
+      const response = await fetch(`${series.dataset.endpoint}?index=${target}&before=${before}&after=${after}`, {
+        signal: abort.signal, credentials: "same-origin", cache: "no-store"
+      });
+      if (!response.ok) throw new Error("Image unavailable");
+      const data = await response.json();
+      if (data.index !== target || data.total !== total || !Array.isArray(data.images) ||
+          data.images.length !== Math.min(total, target + after + 1) - start || data.images.length > 21 ||
+          !Number.isFinite(data.ttl) || data.ttl <= 0 ||
+          data.images.some((item, offset) => item.index !== start + offset || typeof item.url !== "string" || !item.url)) {
+        throw new Error("Invalid image response");
+      }
+      if (disposed) return;
+      data.images.forEach((item) => {
+        const old = cache.get(item.index);
+        if (fresh(old) && old.url === item.url) return;
+        if (old) release(old);
+        cache.set(item.index, {url: item.url, expires: Date.now() + data.ttl * 1000});
+      });
+      prune();
+    })();
+    metadataPending = task;
+    try { await task; } finally { clearTimeout(timeout); if (metadataPending === task) metadataPending = null; }
+  };
+  const decode = (entry, speculative = false) => {
+    if (entry.decoded) return Promise.resolve(entry.decoded);
+    if (entry.loading) return entry.loading;
+    if (speculative) {
+      if (viewerBudget.active >= 2 || viewerBudget.bytes + imageBytes > viewerBudget.limit) return null;
+      viewerBudget.active++;
+      entry.reserved = imageBytes;
+      viewerBudget.bytes += entry.reserved;
+    }
+    const preload = new Image();
+    preload.decoding = "async";
+    preload.fetchPriority = speculative ? "low" : "high";
+    let loadTimeout;
+    const task = (async () => {
+      try {
+        const loaded = new Promise((resolve, reject) => {
+          preload.onload = resolve;
+          preload.onerror = () => reject(new Error("Image unavailable"));
+        });
+        preload.src = entry.url;
+        const deadline = new Promise((resolve, reject) => {
+          loadTimeout = setTimeout(() => {
+            preload.onload = null; preload.onerror = null;
+            preload.removeAttribute("src");
+            reject(new Error("Image load timeout"));
+          }, 8000);
+        });
+        await Promise.race([(async () => { await loaded; if (preload.decode) await preload.decode(); })(), deadline]);
+        const bytes = preload.naturalWidth * preload.naturalHeight * 4;
+        if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("Invalid image size");
+        // Do not retain a speculative large image or one evicted during a jump.
+        const retained = !disposed && [...cache.values()].includes(entry);
+        if (speculative && (!retained || viewerBudget.bytes - entry.reserved + bytes > viewerBudget.limit)) {
+          release(entry);
+          entry.noWarm = true;
+          return preload;
+        }
+        if (entry.reserved) { viewerBudget.bytes += bytes - entry.reserved; entry.reserved = bytes; }
+        if (retained) entry.decoded = preload;
+        return preload;
+      } catch (error) {
+        release(entry);
+        throw error;
+      } finally {
+        clearTimeout(loadTimeout);
+        entry.loading = null;
+        if (speculative) {
+          viewerBudget.active--;
+          for (const wake of viewerBudget.waiters) wake();
+        }
+      }
+    })();
+    entry.loading = task;
+    return task;
+  };
+  const schedulePump = () => {
+    clearTimeout(pumpTimer);
+    if (!disposed) pumpTimer = setTimeout(pump, 40);
+  };
+  const pump = () => {
+    if (disposed) return;
+    prune();
+    // At most six warmed neighbors per series, direction first; metadata can
+    // look farther ahead without downloading those JPEGs.
+    const targets = [];
+    for (let n = 1; n <= 6; n++) targets.push(index + direction * n);
+    targets.push(index - direction, index - direction * 2);
+    let warmed = 0;
+    for (const target of targets) {
+      if (target < 0 || target >= total) continue;
+      const entry = cache.get(target);
+      if (!fresh(entry) || entry.failed || entry.noWarm) continue;
+      if (++warmed > 6) break;
+      if (!entry.decoded && !entry.loading) {
+        const task = decode(entry, true);
+        task?.catch(() => { entry.failed = true; }).finally(schedulePump);
+      }
     }
   };
-  const display = (entry) => {
-    image.src = entry.url;
-    image.alt = `${series.getAttribute("aria-label")} - corte ${index + 1} de ${total}`;
-    image.hidden = false;
-    if (entry.loaded || (image.complete && image.naturalWidth > 0)) status.textContent = "";
-    warmWindow();
+  const refill = () => {
+    clearTimeout(idleTimer);
+    if (disposed) return;
+    idleTimer = setTimeout(async () => {
+      const target = Math.max(0, Math.min(total - 1, index + direction * Math.ceil(windowSize() / 2)));
+      if (!fresh(cache.get(target))) {
+        try { await fetchWindow(index); } catch (error) { /* foreground owns visible errors */ }
+      }
+      schedulePump();
+    }, 120);
   };
-  const show = async (value, renew = false) => {
+  const pendingLabel = () => {
+    output.value = displayed >= 0 ? `Visible ${displayed + 1} / ${total}; solicitado ${index + 1}` : `${index + 1} / ${total}`;
+    status.textContent = displayed >= 0 ? `Cargando corte ${index + 1}… Sigue visible el corte ${displayed + 1}.` : `Cargando corte ${index + 1}…`;
+    frame.setAttribute("aria-busy", "true");
+  };
+  const present = async (token, renew = false) => {
+    try {
+      if (metadataPending) await metadataPending.catch(() => {});
+      if (token !== generation || disposed) return;
+      if (renew || !fresh(cache.get(index))) await fetchWindow(index);
+      if (token !== generation || disposed) return;
+      const requested = index;
+      const entry = cache.get(requested);
+      // Only one demanded download per series. Rapid changes wait for it and
+      // then select the newest target, instead of starting many stale GETs.
+      if (foregroundPending) await foregroundPending.catch(() => {});
+      if (token !== generation || disposed) return;
+      const task = decode(entry);
+      foregroundPending = task;
+      let ready;
+      try { ready = await task; }
+      finally { if (foregroundPending === task) foregroundPending = null; }
+      if (token !== generation || disposed) { schedulePump(); return; }
+      image.src = ready.src;
+      image.alt = `${series.getAttribute("aria-label")} - corte ${requested + 1} de ${total}`;
+      image.hidden = false;
+      imageBytes = ready.naturalWidth * ready.naturalHeight * 4;
+      displayed = requested;
+      output.value = `${displayed + 1} / ${total}`;
+      status.textContent = "";
+      frame.setAttribute("aria-busy", "false");
+      prune();
+      schedulePump();
+      refill();
+    } catch (error) {
+      if (token !== generation || disposed) return;
+      if (!renew && fresh(cache.get(index))) {
+        const old = cache.get(index);
+        release(old);
+        cache.delete(index);
+        await present(token, true);
+        return;
+      }
+      status.textContent = displayed >= 0 ? `Corte ${index + 1} no disponible. Sigue visible el corte ${displayed + 1}.` : "Imagen no disponible. Cambia de corte para volver a intentarlo.";
+      frame.setAttribute("aria-busy", "false");
+    }
+  };
+  const show = (value, force = false) => {
     const target = Math.max(0, Math.min(total - 1, value));
-    if (!renew && target === index && image.getAttribute("src")) return;
+    if (!force && target === index && displayed >= 0) return;
+    const now = Date.now();
+    if (target !== index) {
+      direction = Math.sign(target - index);
+      if (now - lastMove < 180) fastUntil = now + 1000;
+      lastMove = now;
+    }
     index = target;
-    if (!renew) renewalAttempted = false;
     const token = ++generation;
-    controller?.abort();
-    warming?.abort();
-    warming = null;
     prune();
     range.value = String(index + 1);
-    output.value = `${index + 1} / ${total}`;
     previous.disabled = index === 0;
     next.disabled = index === total - 1;
-    const current = cache.get(index);
-    // A decoded neighbor can swap directly, without flashing the loading label.
-    status.textContent = !renew && fresh(current) && current.loaded ? "" : "Cargando imagen…";
-    image.hidden = true;
-    image.removeAttribute("src");
-    if (!renew && fresh(current)) {
-      display(current);
-      return;
-    }
-    controller = new AbortController();
-    const requested = index;
-    try {
-      const data = await request(requested, controller.signal);
-      if (token !== generation) return;
-      if (renew) cache.delete(requested);
-      remember(data, requested);
-      display(cache.get(requested));
-    } catch (error) {
-      if (token !== generation || error.name === "AbortError") return;
-      status.textContent = "Imagen no disponible. Cambia de corte para volver a intentarlo.";
-    }
+    pendingLabel();
+    present(token);
+    refill();
   };
-  image.addEventListener("load", () => { status.textContent = ""; });
-  image.addEventListener("error", () => {
-    if (!image.getAttribute("src")) return;
-    if (!renewalAttempted) {
-      renewalAttempted = true;
-      show(index, true);
-    } else {
-      status.textContent = "Imagen no disponible. Cambia de corte para volver a intentarlo.";
-    }
-  });
   previous.addEventListener("click", () => show(index - 1));
   next.addEventListener("click", () => show(index + 1));
   let scrubTimer;
@@ -137,10 +245,8 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     clearTimeout(scrubTimer);
     scrubTimer = setTimeout(() => show(Number(range.value) - 1), 80);
   });
-  let wheelDelta = 0;
-  let wheelTime = 0;
+  let wheelDelta = 0, wheelTime = 0;
   frame.addEventListener("wheel", (event) => {
-    // Preserve browser zoom and horizontal trackpad gestures.
     if (event.ctrlKey || event.metaKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY) return;
     event.preventDefault();
     const now = Date.now();
@@ -158,6 +264,20 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       show(index + (event.key === "ArrowRight" ? 1 : -1));
     }
   });
+  window.addEventListener("pagehide", () => {
+    disposed = true;
+    viewerBudget.waiters.delete(schedulePump);
+    clearTimeout(idleTimer); clearTimeout(pumpTimer); clearTimeout(scrubTimer);
+    for (const entry of cache.values()) release(entry);
+    cache.clear();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    disposed = false;
+    viewerBudget.waiters.add(schedulePump);
+    show(index, true);
+  });
+  viewerBudget.waiters.add(schedulePump);
   controls.hidden = false;
   show(0);
 });

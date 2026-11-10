@@ -71,6 +71,23 @@ For Resend, set `EMAIL_PROVIDER=resend`, a verified `DEFAULT_FROM_EMAIL` and
 application. An empty `DEFAULT_REPLY_TO_EMAIL` omits Reply-To. No test email is
 sent automatically.
 
+Gunicorn WSGI reuses PostgreSQL connections for up to 60 seconds by default,
+with health checks before reuse. `DATABASE_CONN_MAX_AGE` may be set to 0-60;
+0 disables reuse. The two synchronous Gunicorn workers normally retain at most
+two connections, not a growing pool. Capacity and reconnection after a database
+restart must be checked for each deployment. An ASGI deployment must disable
+this setting or use its own supported backend pool.
+
+The viewer requests bounded metadata windows (at most 21 URLs), not full-series
+manifests. It warms at most six neighbors per series, prioritizing direction,
+and allows at most two speculative image loads across all series. Retained
+speculative decoded pixels have a shared estimated 64 MiB budget. Current
+visible images, transient decoding and the browser-managed HTTP cache are not
+part of this estimate; it is not a hard limit on browser process memory. Large
+images are not repeatedly warmed if they exceed this budget. The previous
+image stays visible while a requested image decodes, explicitly labelled with
+both visible and requested slice numbers. No low-resolution substitute is used.
+
 ## Build and synthetic preview on a new VM
 
 An immutable release or commit is selected first. From that checkout:

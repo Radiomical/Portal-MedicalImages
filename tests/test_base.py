@@ -72,6 +72,17 @@ class ConfigurationIsolationTests(SimpleTestCase):
         env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": "synthetic-process-only-test-key-0123456789", "DEBUG": "False", "DB_ENGINE": "sqlite", "SECURE_COOKIES": "true", "SECURE_SSL_REDIRECT": "true"}
         result = subprocess.run([sys.executable, "-c", "from django.conf import settings; assert settings.DEBUG is False; assert settings.SESSION_COOKIE_SECURE; assert settings.CSRF_COOKIE_SECURE; assert settings.SECURE_SSL_REDIRECT"], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+    def test_postgres_connection_reuse_is_bounded_and_health_checked(self):
+        import subprocess, sys
+        env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": "synthetic-process-only-test-key-0123456789", "DB_ENGINE": "postgresql"}
+        for value in ("", "0", "60"):
+            result = subprocess.run([sys.executable, "-c", "from django.conf import settings; import os; db=settings.DATABASES['default']; assert db['CONN_MAX_AGE']==int(os.environ['DATABASE_CONN_MAX_AGE'] or '60'); assert db['CONN_HEALTH_CHECKS']"], env={**env, "DATABASE_CONN_MAX_AGE": value}, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        for value in ("-1", "61", "invalid"):
+            result = subprocess.run([sys.executable, "-c", "from django.conf import settings; print(settings.DATABASES)"], env={**env, "DATABASE_CONN_MAX_AGE": value}, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DATABASE_CONN_MAX_AGE", result.stderr)
+
     def test_missing_secret_key_refuses_startup(self):
         import subprocess, sys
         env = {**os.environ, "DJANGO_SETTINGS_MODULE": "portal.settings", "SECRET_KEY": ""}
