@@ -145,7 +145,8 @@ SECURE_CSP = {
     "style-src-attr": [CSP.NONE],
     "img-src": _image_origins,
     "font-src": [CSP.SELF],
-    "connect-src": [CSP.SELF],
+    # Byte prefetch may read only the validated public JPEG custom origin.
+    "connect-src": [CSP.SELF] + ([R2_IMAGE_PUBLIC_BASE_URL] if MEDIA_STORAGE == "r2" and R2_IMAGE_PUBLIC_BASE_URL else []),
     "object-src": [CSP.NONE],
     "frame-src": [CSP.NONE],
     "frame-ancestors": [CSP.NONE],

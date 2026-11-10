@@ -94,3 +94,13 @@ class NormalizedReaderTests(TestCase):
             self.assertEqual(self.client.get(url, params).json(), legacy)
         Image.objects.filter(series__case_id=self.post.pk, series__plane='axial', position=60).delete()
         self.assertEqual(self.client.get(url, {'index': 50, 'before': 4, 'after': 16}).status_code, 503)
+
+    @override_settings(CASE_MEDIA_DUAL_WRITE=True, CASE_MEDIA_NORMALIZED_READ=True)
+    def test_manifest_page_preserves_projection_integrity_and_order(self):
+        url = reverse('blog:series_slice', args=[self.post.pk, 'axial'])
+        with patch('blog.views.default_storage.url', side_effect=lambda key: '/fixture/' + key):
+            data = self.client.get(url, {'index': 0, 'count': 128}).json()
+        self.assertEqual(len(data['images']), 120)
+        self.assertEqual(data['images'][-1]['index'], 119)
+        Image.objects.filter(series__case_id=self.post.pk, position=50).delete()
+        self.assertEqual(self.client.get(url, {'index': 0, 'count': 128}).status_code, 503)

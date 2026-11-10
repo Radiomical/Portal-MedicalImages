@@ -101,7 +101,8 @@ class PublicImageCacheTests(SimpleTestCase):
         policy = json.loads(result.stdout)
         self.assertIn('https://media.example.test', policy['img-src'])
         self.assertNotIn('https://media.example.test', policy['script-src'])
-        self.assertNotIn('https://media.example.test', policy['connect-src'])
+        self.assertIn('https://media.example.test', policy['connect-src'])
+        self.assertNotIn('https://s3.example.test', policy['connect-src'])
         for overrides in ({'R2_DICOM_BUCKET': 'synthetic-images'}, {'MEDIA_STORAGE': 'filesystem'},
                           {'R2_DICOM_BUCKET': ''}):
             with self.subTest(overrides=overrides):

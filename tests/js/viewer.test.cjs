@@ -23,7 +23,7 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
     return {dataset: {count: String(total), endpoint: `/synthetic/${plane}/slices/`}, querySelector: k => selectors[k], getAttribute: () => 'Synthetic series'};
   });
   const context = {
-    document: {querySelectorAll: () => series}, window: {addEventListener(name, callback) {windowEvents[name] = callback;}}, AbortController,
+    document: {querySelectorAll: () => series}, window: {addEventListener(name, callback) {windowEvents[name] = callback;}}, AbortController, location: {href: "http://synthetic.local"}, URL, Blob, DOMException,
     setTimeout: (fn, ms) => setTimeout(fn, fastTimeout && ms === 8000 ? 15 : ms).unref(), clearTimeout, Date,
     Image: class {
       constructor() { this.naturalWidth = 512; this.naturalHeight = 512; }
@@ -37,10 +37,12 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
       const index = Number(u.searchParams.get('index'));
       const before = Number(u.searchParams.get('before'));
       const after = Number(u.searchParams.get('after'));
-      calls.push({index, before, after});
+      const count = Number(u.searchParams.get('count'));
+      if (u.pathname.endsWith('.jpg')) return {ok: false};
+      calls.push(count ? {index, count} : {index, before, after});
       if (deferMetadata && calls.length === 1) return new Promise(resolve => metaHeld.push(resolve));
       if (fail) return {ok: false};
-      const start = Math.max(0, index - before), end = Math.min(total, index + after + 1);
+      const start = Math.max(0, index - before), end = Math.min(total, index + (count || after + 1));
       return {ok: true, json: async () => ({index, total, ttl: 300, images: Array.from({length: end - start}, (_, i) => ({index: start + i, url: `/synthetic/${start+i}.jpg`}))})};
     }
   };
@@ -53,8 +55,8 @@ function viewer(total = 120, fail = false, holdImages = false, planes = 1, failu
 }
 test('initial metadata and JPEG warmup stay bounded, never a stack', async () => {
   const v = viewer(5000); await settle(); await sleep(220); await settle();
-  assert.deepEqual(v.calls, [{index: 0, before: 4, after: 8}]);
-  assert.ok(new Set(v.images).size <= 7);
+  assert.deepEqual(v.calls, [{index: 0, count: 128}]);
+  assert.ok(new Set(v.images).size <= 3);
   assert.ok(v.budget().bytes <= 64 * 1024 * 1024);
 });
 test('cached transitions and reversal display exact decoded slice', async () => {
@@ -193,4 +195,51 @@ test('back-forward-cache restore reactivates controls and reloads current metada
   v.get('[data-next]').events.click(); await settle();
   assert.equal(v.get('[data-current-slice]').src, '/synthetic/1.jpg');
   assert.equal(v.get('output').value, '2 / 120');
+});
+
+function bytePool(fetch) {
+  const context = {document: {querySelectorAll: () => []}, location: {href: 'https://fixture.test'}, URL, Blob, DOMException, AbortController, TypeError, setTimeout, clearTimeout, fetch};
+  vm.runInNewContext(source, context);
+  return vm.runInNewContext('seriesBytes', context);
+}
+function byteResponse(size = 32) {
+  return {ok: true, headers: new Map([['Content-Type', 'image/jpeg'], ['Content-Length', String(size)]]), body: new ReadableStream({start(controller) {controller.enqueue(new Uint8Array(size));controller.close();}})};
+}
+test('compressed cache downloads bytes without constructing or decoding Images', async () => {
+  let calls = 0;
+  const pool = bytePool(async () => {calls++;return byteResponse();});
+  const signal = new AbortController().signal;
+  const result = await pool.download('/image.jpg', signal);
+  assert.equal(result.size, 32);assert.equal(pool.bytes, 32);assert.equal(pool.active, 0);
+  await pool.download('/image.jpg', signal);assert.equal(calls, 1);
+  pool.clear();assert.equal(pool.bytes, 0);
+});
+test('compressed cache caps objects, total bytes and explicit preparation without eviction', async () => {
+  const pool = bytePool(async () => byteResponse(40));pool.limit=64;pool.objectLimit=48;
+  const signal = new AbortController().signal;
+  await pool.download('/one.jpg', signal);
+  await assert.rejects(pool.download('/two.jpg', signal, true), /budget/);
+  assert.equal(pool.bytes, 40);assert.ok(pool.get('/one.jpg'));
+  await pool.download('/two.jpg', signal);assert.equal(pool.get('/one.jpg'), undefined);assert.equal(pool.bytes, 40);
+  pool.objectLimit=16;await assert.rejects(pool.download('/huge.jpg', signal), /limit/);
+  assert.equal(pool.active, 0);assert.equal(pool.bytes, 40);
+});
+test('CORS failure disables byte downloads for that origin, ordinary viewer remains independent', async () => {
+  let calls=0;const pool=bytePool(async () => {calls++;throw new TypeError('CORS');});const signal=new AbortController().signal;
+  await assert.rejects(pool.download('/one.jpg', signal));await assert.rejects(pool.download('/two.jpg', signal));
+  assert.equal(calls,1);assert.equal(pool.active,0);
+});
+test('cancelled byte download cannot publish bytes after the page was cleared', async () => {
+  let done;const pool=bytePool(async () => new Promise(resolve => {done=resolve;}));const controller=new AbortController();
+  const pending=pool.download('/one.jpg',controller.signal);controller.abort();done(byteResponse());
+  await assert.rejects(pending, /Cancelled/);assert.equal(pool.bytes,0);assert.equal(pool.active,0);
+});
+test('return to an already decoded cut never waits for an unrelated foreground download', async () => {
+  const v=viewer(120,false,true);await settle();v.held.shift()();await settle();
+  v.get('[data-next]').events.click();await settle();
+  v.get('[data-previous]').events.click();await settle();
+  assert.equal(v.get('output').value,'1 / 120');
+  assert.equal(v.get('[data-series-status]').textContent,'');
+  v.held.shift()();await settle();
+  assert.equal(v.get('output').value,'1 / 120');
 });

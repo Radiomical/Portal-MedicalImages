@@ -87,3 +87,18 @@ class BoundedViewerTests(TestCase):
     def test_unbounded_or_malformed_windows_are_rejected(self):
         for before, after in [(-1, 1), (4, 17), (17, 4), (16, 16), ('invalid', 1)]:
             self.assertEqual(self.endpoint(index=50, before=before, after=after).status_code, 400)
+
+    def test_manifest_pages_are_bounded_and_keep_default_windows(self):
+        with patch('blog.views.default_storage.url', side_effect=lambda key: '/fixture/' + key), CaptureQueriesContext(connection) as queries:
+            data = self.endpoint(index=0, count=128).json()
+        self.assertEqual(len(data['images']), 120)
+        self.assertEqual(data['images'][-1]['index'], 119)
+        self.assertEqual(len(queries), 1)
+        self.assertEqual(len(self.endpoint(index=110, count=128).json()['images']), 10)
+        self.assertEqual(len(self.endpoint(index=0).json()['images']), 2)
+
+    def test_manifest_rejects_unbounded_or_mixed_inputs(self):
+        for count in [-1, 0, 129, 'bad', 2**64]:
+            self.assertEqual(self.endpoint(index=0, count=count).status_code, 400)
+        self.assertEqual(self.endpoint(index=0, count=20, after=1).status_code, 400)
+        self.assertEqual(self.endpoint(index=0, count=20, before=0).status_code, 400)

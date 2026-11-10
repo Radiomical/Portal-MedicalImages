@@ -1,8 +1,70 @@
 "use strict";
-// Metadata: <=21 URLs per series. Decoded speculation: <=64 MiB estimated across
+// Metadata: <=128 URLs per request, bounded sliding cache. Decoded speculation: <=64 MiB estimated across
 // all series, <=2 concurrent speculative images. Visible images/browser HTTP
 // cache are outside this estimate; the browser controls their actual allocation.
 const viewerBudget = {bytes: 0, active: 0, waiters: new Set(), limit: 64 * 1024 * 1024};
+// Compressed bytes and decoded pixels are separate, bounded caches. Blob URLs
+// live only as long as their decoded Image; downloads never call Image.decode.
+const seriesBytes = {
+  limit: 96 * 1024 * 1024, objectLimit: 8 * 1024 * 1024, bytes: 0,
+  active: 0, entries: new Map(), pending: new Map(), activeSeries: null,
+  preparing: null, disabled: new Set(),
+  get(url) {
+    const value = this.entries.get(url);
+    if (value) { this.entries.delete(url); this.entries.set(url, value); }
+    return value;
+  },
+  clear() { this.entries.clear(); this.bytes = 0; for (const item of this.pending.values()) item.abort(); },
+  async download(url, signal, retainAll = false) {
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+    const cached = this.get(url);
+    if (cached) return cached;
+    if (this.active >= 3 || this.pending.has(url)) return null;
+    const origin = new URL(url, location.href).origin;
+    if (this.disabled.has(origin)) throw new Error('Byte cache unavailable');
+    const abort = new AbortController();
+    const cancel = () => abort.abort();
+    signal.addEventListener('abort', cancel, {once: true});
+    this.pending.set(url, abort); this.active++;
+    const timeout = setTimeout(cancel, 12000);
+    try {
+      const response = await fetch(url, {mode: 'cors', credentials: 'omit', cache: 'force-cache', signal: abort.signal, priority: 'low'});
+      if (!response.ok || !response.headers.get('Content-Type')?.toLowerCase().startsWith('image/')) throw new Error('Invalid image response');
+      const declared = Number(response.headers.get('Content-Length') || 0);
+      if (declared > this.objectLimit) throw new Error('Image exceeds download limit');
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Streaming download unavailable');
+      const chunks = []; let size = 0;
+      try {
+        while (true) {
+          const chunk = await reader.read(); if (chunk.done) break;
+          size += chunk.value.byteLength;
+          if (size > this.objectLimit) throw new Error('Image exceeds download limit');
+          chunks.push(chunk.value);
+        }
+      } finally { await reader.cancel().catch(() => {}); }
+      if (signal.aborted || abort.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      if (!size) throw new Error('Empty image response');
+      if (retainAll && this.bytes + size > this.limit) throw new Error('Series exceeds download budget');
+      while (this.bytes + size > this.limit && this.entries.size) {
+        const oldest = this.entries.keys().next().value;
+        this.bytes -= this.entries.get(oldest).size; this.entries.delete(oldest);
+      }
+      const blob = new Blob(chunks, {type: response.headers.get('Content-Type')});
+      this.entries.set(url, blob); this.bytes += size;
+      return blob;
+    } catch (error) {
+      // A failed CORS policy must not break the ordinary <img> path, nor be
+      // retried continuously for every image on the same origin.
+      if (error instanceof TypeError) this.disabled.add(origin);
+      throw error;
+    } finally {
+      clearTimeout(timeout); signal.removeEventListener('abort', cancel);
+      this.pending.delete(url); this.active--;
+    }
+  }
+};
+
 document.querySelectorAll("[data-series]").forEach((series) => {
   const controls = series.querySelector(".series-controls");
   const range = controls.querySelector("input");
@@ -12,21 +74,29 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const frame = series.querySelector(".series-frame");
   const image = series.querySelector("[data-current-slice]");
   const status = series.querySelector("[data-series-status]");
+  const prepareButton = series.querySelector('[data-prepare-series]');
+  const cancelButton = series.querySelector('[data-cancel-prepare]');
+  const prepareStatus = series.querySelector('[data-prepare-status]');
   const total = Number(series.dataset.count);
   if (!Number.isSafeInteger(total) || total < 1) return;
   const cache = new Map();
+  if (!seriesBytes.activeSeries) seriesBytes.activeSeries = series;
+  let downloads = new AbortController(), preparation, byteTimer;
+  let manifestAbort, byteUnavailable = false;
   let index = 0, displayed = -1, generation = 0, direction = 1;
   let lastMove = 0, fastUntil = 0, metadataPending, foregroundPending;
   let idleTimer, pumpTimer, disposed = false;
   let imageBytes = 4 * 1024 * 1024;
   const fresh = (entry) => entry && entry.expires > Date.now() + 10000;
-  const windowSize = () => Date.now() < fastUntil ? 16 : 8;
+  const windowSize = () => Date.now() < fastUntil ? 64 : 32;
   const bounds = () => direction > 0 ? [Math.max(0, index - 4), Math.min(total - 1, index + windowSize())] :
     [Math.max(0, index - windowSize()), Math.min(total - 1, index + 4)];
   const release = (entry) => {
     if (entry.reserved) viewerBudget.bytes -= entry.reserved;
     entry.reserved = 0;
     entry.decoded = null;
+    if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+    entry.blobUrl = null;
   };
   const prune = () => {
     const [low, high] = bounds();
@@ -52,20 +122,18 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   };
   const fetchWindow = async (target) => {
     if (metadataPending) return metadataPending;
-    const ahead = windowSize();
-    const before = direction > 0 ? 4 : ahead;
-    const after = direction > 0 ? ahead : 4;
-    const start = Math.max(0, target - before);
+    const count = 128;
+    const start = Math.max(0, Math.min(target - 24, total - count));
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 8000);
     const task = (async () => {
-      const response = await fetch(`${series.dataset.endpoint}?index=${target}&before=${before}&after=${after}`, {
+      const response = await fetch(`${series.dataset.endpoint}?index=${start}&count=${count}`, {
         signal: abort.signal, credentials: "same-origin", cache: "no-store"
       });
       if (!response.ok) throw new Error("Image unavailable");
       const data = await response.json();
-      if (data.index !== target || data.total !== total || !Array.isArray(data.images) ||
-          data.images.length !== Math.min(total, target + after + 1) - start || data.images.length > 21 ||
+      if (data.index !== start || data.total !== total || !Array.isArray(data.images) ||
+          data.images.length !== Math.min(count, total - start) || data.images.length > 128 ||
           !Number.isFinite(data.ttl) || data.ttl <= 0 ||
           data.images.some((item, offset) => item.index !== start + offset || typeof item.url !== "string" || !item.url)) {
         throw new Error("Invalid image response");
@@ -101,7 +169,9 @@ document.querySelectorAll("[data-series]").forEach((series) => {
           preload.onload = resolve;
           preload.onerror = () => reject(new Error("Image unavailable"));
         });
-        preload.src = entry.url;
+        const blob = seriesBytes.get(entry.url);
+        if (blob) entry.blobUrl = URL.createObjectURL(blob);
+        preload.src = entry.blobUrl || entry.url;
         const deadline = new Promise((resolve, reject) => {
           loadTimeout = setTimeout(() => {
             preload.onload = null; preload.onerror = null;
@@ -144,23 +214,104 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   const pump = () => {
     if (disposed) return;
     prune();
-    // At most six warmed neighbors per series, direction first; metadata can
-    // look farther ahead without downloading those JPEGs.
+    // Decode only two near neighbors of the active series. Compressed-byte
+    // prefetch can look farther ahead without pinning decoded pixel memory.
+    if (seriesBytes.activeSeries !== series) return;
+    scheduleBytes();
     const targets = [];
-    for (let n = 1; n <= 6; n++) targets.push(index + direction * n);
+    for (let n = 1; n <= 2; n++) targets.push(index + direction * n);
     targets.push(index - direction, index - direction * 2);
     let warmed = 0;
     for (const target of targets) {
       if (target < 0 || target >= total) continue;
       const entry = cache.get(target);
       if (!fresh(entry) || entry.failed || entry.noWarm) continue;
-      if (++warmed > 6) break;
+      if (++warmed > 2) break;
       if (!entry.decoded && !entry.loading) {
         const task = decode(entry, true);
         task?.catch(() => { entry.failed = true; }).finally(schedulePump);
       }
     }
   };
+  const scheduleBytes = () => {
+    clearTimeout(byteTimer);
+    if (disposed || byteUnavailable || preparation || seriesBytes.preparing || seriesBytes.activeSeries !== series) return;
+    byteTimer = setTimeout(async () => {
+      const candidates = [];
+      for (let n = 1; n <= 24; n++) {
+        const entry = cache.get(index + direction * n);
+        if (fresh(entry) && !seriesBytes.get(entry.url)) candidates.push(entry);
+      }
+      const batch = candidates.slice(0, 3);
+      await Promise.all(batch.map(async entry => {
+        try { await seriesBytes.download(entry.url, downloads.signal); }
+        catch (error) { if (!downloads.signal.aborted) byteUnavailable = true; }
+      }));
+      if (batch.length && !disposed && !downloads.signal.aborted &&
+          !seriesBytes.disabled.size) scheduleBytes();
+    }, 50);
+  };
+  const prepareSeries = async () => {
+    if (seriesBytes.preparing || preparation) {
+      prepareStatus.textContent = 'Otra preparación está en curso. Cancélala o espera a que termine.';
+      return;
+    }
+    preparation = new AbortController();
+    const job = preparation;
+    seriesBytes.preparing = job;
+    downloads.abort(); downloads = new AbortController();
+    clearTimeout(byteTimer);
+    // Preparation is explicitly one selected series, up to the global byte
+    // budget. It never downloads private DICOM or changes an object.
+    seriesBytes.clear();
+    prepareButton.disabled = true; cancelButton.hidden = false;
+    let complete = 0;
+    try {
+      for (let start = 0; start < total; start += 128) {
+        manifestAbort = new AbortController();
+        const abortPage = () => manifestAbort.abort();
+        job.signal.addEventListener('abort', abortPage, {once: true});
+        const timer = setTimeout(abortPage, 8000);
+        let data;
+        try {
+          const response = await fetch(`${series.dataset.endpoint}?index=${start}&count=128`, {
+            signal: manifestAbort.signal, credentials: 'same-origin', cache: 'no-store'
+          });
+          if (!response.ok) throw new Error('Manifest unavailable');
+          data = await response.json();
+        } finally { clearTimeout(timer); job.signal.removeEventListener('abort', abortPage); }
+        if (data.index !== start || data.total !== total || !Array.isArray(data.images) ||
+            data.images.length !== Math.min(128, total - start) ||
+            data.images.some((item, offset) => item.index !== start + offset || typeof item.url !== 'string' || !item.url)) {
+          throw new Error('Invalid manifest page');
+        }
+        for (let offset = 0; offset < data.images.length; offset += 3) {
+          await Promise.all(data.images.slice(offset, offset + 3).map(async item => {
+            if (job.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+            let blob;
+            while (!blob) {
+              blob = await seriesBytes.download(item.url, job.signal, true);
+              if (!blob) await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            if (job.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+            complete++;
+            prepareStatus.textContent = `Descargados ${complete} / ${total}; ${(seriesBytes.bytes / 1048576).toFixed(1)} / 96 MiB.`;
+          }));
+        }
+      }
+      prepareStatus.textContent = `Serie descargada: ${complete} cortes. Conservada en esta pestaña hasta salir, preparar otra serie o superar el presupuesto.`;
+    } catch (error) {
+      prepareStatus.textContent = job.signal.aborted ? `Preparación cancelada: ${complete} / ${total}.` :
+        `Preparación incompleta: ${complete} / ${total}. Límite de 96 MiB, archivo de 8 MiB, red o permiso de descarga. El visor normal sigue disponible.`;
+    } finally {
+      job.abort();
+      if (preparation === job) preparation = null;
+      if (seriesBytes.preparing === job) seriesBytes.preparing = null;
+      prepareButton.disabled = false; cancelButton.hidden = true;
+    }
+  };
+  prepareButton?.addEventListener('click', prepareSeries);
+  cancelButton?.addEventListener('click', () => preparation?.abort());
   const refill = () => {
     clearTimeout(idleTimer);
     if (disposed) return;
@@ -179,7 +330,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   };
   const present = async (token, renew = false) => {
     try {
-      if (metadataPending) await metadataPending.catch(() => {});
+      if (metadataPending && (renew || !fresh(cache.get(index)))) await metadataPending.catch(() => {});
       if (token !== generation || disposed) return;
       if (renew || !fresh(cache.get(index))) await fetchWindow(index);
       if (token !== generation || disposed) return;
@@ -187,7 +338,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
       const entry = cache.get(requested);
       // Only one demanded download per series. Rapid changes wait for it and
       // then select the newest target, instead of starting many stale GETs.
-      if (foregroundPending) await foregroundPending.catch(() => {});
+      if (foregroundPending && !entry.decoded) await foregroundPending.catch(() => {});
       if (token !== generation || disposed) return;
       const task = decode(entry);
       foregroundPending = task;
@@ -224,6 +375,10 @@ document.querySelectorAll("[data-series]").forEach((series) => {
     if (!force && target === index && displayed >= 0) return;
     const now = Date.now();
     if (target !== index) {
+      seriesBytes.activeSeries = series;
+      if (Math.abs(target - index) > 16 || Math.sign(target - index) !== direction) {
+        downloads.abort(); downloads = new AbortController();
+      }
       direction = Math.sign(target - index);
       if (now - lastMove < 180) fastUntil = now + 1000;
       lastMove = now;
@@ -266,6 +421,9 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   });
   window.addEventListener("pagehide", () => {
     disposed = true;
+    downloads.abort(); preparation?.abort(); manifestAbort?.abort();
+    clearTimeout(byteTimer);
+    seriesBytes.clear();
     viewerBudget.waiters.delete(schedulePump);
     clearTimeout(idleTimer); clearTimeout(pumpTimer); clearTimeout(scrubTimer);
     for (const entry of cache.values()) release(entry);
@@ -274,6 +432,7 @@ document.querySelectorAll("[data-series]").forEach((series) => {
   window.addEventListener("pageshow", (event) => {
     if (!event.persisted) return;
     disposed = false;
+    downloads = new AbortController();
     viewerBudget.waiters.add(schedulePump);
     show(index, true);
   });

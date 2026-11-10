@@ -103,7 +103,8 @@ def series_slice(request, blog_id, plane):
     """Bounded URLs only: no object GET/LIST, and no change to case audience.
 
     Defaults preserve the two-image response. Adaptive clients may request up to
-    16 in either direction, with at most 21 total; callers cannot supply object keys or request a stack.
+    16 in either direction, with at most 21 total. Manifest pages use count=1..128
+    without before/after; no object keys or unbounded stack input is accepted.
     """
     if plane not in ('axial', 'coronal', 'sagital'):
         raise Http404
@@ -111,14 +112,17 @@ def series_slice(request, blog_id, plane):
         index = int(request.GET.get('index', '0'))
         before = int(request.GET.get('before', '0'))
         after = int(request.GET.get('after', '1'))
+        page_size = int(request.GET.get('count', '0'))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid slice window.'}, status=400)
+    if 'count' in request.GET and (not 1 <= page_size <= 128 or 'before' in request.GET or 'after' in request.GET):
+        return JsonResponse({'error': 'Manifest page exceeds the bounded limit.'}, status=400)
     if not 0 <= before <= 16 or not 0 <= after <= 16 or before + after > 20:
         return JsonResponse({'error': 'Slice window exceeds the bounded limit.'}, status=400)
     if index < 0 or index > 2147483647:
         raise Http404
-    start = max(0, index - before)
-    stop = index + after + 1
+    start = index if page_size else max(0, index - before)
+    stop = index + page_size if page_size else index + after + 1
     normalized = normalized_case(blog_id)
     if normalized is not None:
         from users.models import Image
