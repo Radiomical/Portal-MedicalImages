@@ -12,6 +12,7 @@ ENV/
 # ---- Environment variables / secrets ----
 .env
 .env.*
+!.env.example
 *.env
 
 # ---- Django ----
@@ -48,3 +49,6 @@ dist/
 # ---- OS files ----
 .DS_Store
 Thumbs.db
+
+# Isolated development state
+.local/

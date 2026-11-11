@@ -1,0 +1,51 @@
+name: portal-staging
+services:
+  db:
+    image: postgres:18.6-bookworm@sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal_staging
+      POSTGRES_USER: portal_staging
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set the staging database password}
+    volumes:
+      - staging_database:/var/lib/postgresql
+    networks: [preview]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U portal_staging -d portal_staging']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  web:
+    image: portal-medicalimages:0.1.0-portable-preview
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ${PORTAL_STAGING_ENV_FILE:?Set the private staging environment path}
+    environment:
+      DJANGO_SETTINGS_MODULE: portal.settings_staging
+      DB_ENGINE: postgresql
+      DATABASE_HOST: db
+      DATABASE_PORT: '5432'
+      DATABASE_NAME: portal_staging
+      DATABASE_USER: portal_staging
+      DATABASE_SSLMODE: disable
+    ports: ['127.0.0.1:8081:8081']
+    networks: [preview, ingress]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    volumes:
+      - staging_static:/app/.local/static:ro
+      - staging_media:/app/.local/media:ro
+networks:
+  ingress: {}
+  preview:
+    internal: true
+volumes:
+  staging_database:
+  staging_static:
+  staging_media:

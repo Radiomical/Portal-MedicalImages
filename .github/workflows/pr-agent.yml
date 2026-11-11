@@ -1,0 +1,33 @@
+name: PR Agent
+on:
+  pull_request:
+    branches: [next]
+    types: [opened, ready_for_review, labeled]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+jobs:
+  review:
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      (github.event.action != 'labeled' ||
+       github.event.label.name == 'ai-review-2' ||
+       github.event.label.name == 'ai-review-3')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Review pull request
+        uses: docker://pragent/pr-agent:0.49.0-github_action@sha256:b1ed6e8de56eb4d6e4169ee0d5c209bb5ed1ef071a01c0c042c64b80192a785c
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.PR_AGENT_ANTHROPIC_KEY }}
+          CONFIG.MODEL: anthropic/claude-sonnet-5-5
+          CONFIG.FALLBACK_MODELS: '[]'
+          CONFIG.NUM_RETRIES: '1'
+          CONFIG.RESPONSE_LANGUAGE: en-US
+          GITHUB_ACTION_CONFIG.AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG.AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG.PR_ACTIONS: '["opened", "ready_for_review", "labeled"]'

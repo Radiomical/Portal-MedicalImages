@@ -1,11 +1,19 @@
-import pydicom
+from django.db import transaction
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from users.uploads import prepare_images, store_case_images
+from users.case_media import sync_uploaded_case
 import os
-from PIL import Image
 from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
+from django.core.files.storage import default_storage
+from django.http import JsonResponse, Http404
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
-from users.models import FilePost
+from users.media_reader import normalized_case
+from users.models import Case, FilePost
 from .models import Post
 from users.models import UserProfile
 from users.forms import PostForm, FilePostForm
@@ -15,25 +23,26 @@ def cookies (request):
      return render(request, "aviso-cookies.html")
 
 def home(request):
-    posts = Post.objects.order_by('-date_posted')[:5]
+    posts = case_cards().order_by('-date_posted', '-pk')[:5]
     post_images = retrieve_first_post_image(posts)
 
     return render(request, 'blog/home.html', {'posts': posts, 'post_images': post_images})
 
 
 def all_blogs(request):
-    posts = Post.objects.order_by('-date_posted')
+    posts = case_cards().order_by('-date_posted', '-pk')
     paginator = Paginator(posts, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    post_images = retrieve_first_post_image(posts)
+    post_images = retrieve_first_post_image(page_obj.object_list)
 
     return render(request, 'blog/all_blog_pages.html', {'post_images': post_images, 'page_obj': page_obj})
 
 
 def blog_page(request, blog_name, blog_id):
-    post = get_object_or_404(Post, id=blog_id)
+    post = get_object_or_404(Post.objects.select_related('author'), id=blog_id)
     user_profile = UserProfile.objects.filter(user=post.author).first()
+    country = academic_year = work_location = medical_specialty = ''
     if user_profile is not None:
         country = user_profile.country
         academic_year = user_profile.academic_year
@@ -42,64 +51,130 @@ def blog_page(request, blog_name, blog_id):
 
 
     filepost = FilePost.objects.filter(post=post).first()
-    files = FilePost.objects.filter(post=post)
-    axial_post_images_list = list()
-    coronal_post_images_list = list()
-    sagital_post_images_list = list()
-    axial_description = str()
-    coronal_description = str()
-    sagital_description = str()
-
-    for file in files:
-        if file.axial_images:
-            axial_post_images_list.append(file.axial_images.url)
-            if file.axial_description and file.axial_description != 'None':
-                if not axial_description:
-                    axial_description = file.axial_description
-        if file.coronal_images:
-            coronal_post_images_list.append(file.coronal_images.url)
-            if file.coronal_description and file.coronal_description != 'None':
-                if not coronal_description:
-                    coronal_description = file.coronal_description
-        if file.sagital_images:
-            if file.sagital_description and file.sagital_description != 'None':
-                if not sagital_description:
-                    sagital_description = file.sagital_description
-            sagital_post_images_list.append(file.sagital_images.url)
+    # Only counts and descriptions enter the page, never an entire signed stack.
+    series = {}
+    normalized = normalized_case(post.pk)
+    if normalized is not None:
+        from django.db.models import Count
+        details = {row['plane']: row for row in normalized.series.annotate(image_count=Count('images')).values('plane', 'description', 'image_count')}
+        for plane in ('axial', 'coronal', 'sagital'):
+            row = details.get(plane, {})
+            series[plane] = {'count': row.get('image_count', 0), 'description': row.get('description', '')}
+    else:
+        for plane in ('axial', 'coronal', 'sagital'):
+            field = plane + '_images'
+            rows = FilePost.objects.filter(post=post).exclude(**{field: None}).exclude(**{field: ''}).order_by('pk')
+            count = rows.count()
+            description = rows.exclude(**{plane + '_description': None}).exclude(**{plane + '_description': ''}).exclude(**{plane + '_description': 'None'}).values_list(plane + '_description', flat=True).first() or ''
+            series[plane] = {'count': count, 'description': description}
+    axial_description = series['axial']['description']
+    coronal_description = series['coronal']['description']
+    sagital_description = series['sagital']['description']
+    axial_post_images_list = series['axial']['count']
+    coronal_post_images_list = series['coronal']['count']
+    sagital_post_images_list = series['sagital']['count']
 
     if request.user == post.author:
         can_edit = True
     else:
         can_edit = False
 
-    print(axial_description)
 
     return render(request, 'blog/blog_page.html', {'blog_name': blog_name, 'post': post, 'axial_post_images_list': axial_post_images_list, 'coronal_post_images_list': coronal_post_images_list, 'sagital_post_images_list': sagital_post_images_list, 'can_edit': can_edit, 'filepost': filepost, 'country': country, 'academic_year': academic_year, 'work_location': work_location, 'medical_specialty': medical_specialty, 'axial_description': axial_description, 'coronal_description': coronal_description, 'sagital_description': sagital_description})
 
 
+def case_cards():
+    """One cover subquery and author join, not one media query per card."""
+    cover = FilePost.objects.filter(post_id=OuterRef('pk')).order_by('pk').values('header_image')[:1]
+    if settings.CASE_MEDIA_NORMALIZED_READ:
+        from django.db.models import Case as WhenCase, When, F, CharField
+        return Post.objects.select_related('author').annotate(
+            cover_key=WhenCase(When(media_case__projection_stale=False, then=F('media_case__cover_key')), default=Subquery(cover), output_field=CharField()))
+    return Post.objects.select_related('author').annotate(cover_key=Subquery(cover))
+
+
 def retrieve_first_post_image(posts):
-    post_images = {}
+    return {post.pk: default_storage.url(post.cover_key) for post in posts if post.cover_key}
 
-    for post in posts:
-        file = FilePost.objects.filter(post=post).first()
-        if file is not None:
-            post_images[post.id] = file.header_image.url
 
-    return post_images
+@require_GET
+@never_cache
+def series_slice(request, blog_id, plane):
+    """Bounded URLs only: no object GET/LIST, and no change to case audience.
+
+    Defaults preserve the two-image response. Adaptive clients may request up to
+    16 in either direction, with at most 21 total. Manifest pages use count=1..128
+    without before/after; no object keys or unbounded stack input is accepted.
+    """
+    if plane not in ('axial', 'coronal', 'sagital'):
+        raise Http404
+    try:
+        index = int(request.GET.get('index', '0'))
+        before = int(request.GET.get('before', '0'))
+        after = int(request.GET.get('after', '1'))
+        page_size = int(request.GET.get('count', '0'))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid slice window.'}, status=400)
+    if 'count' in request.GET and (not 1 <= page_size <= 128 or 'before' in request.GET or 'after' in request.GET):
+        return JsonResponse({'error': 'Manifest page exceeds the bounded limit.'}, status=400)
+    if not 0 <= before <= 16 or not 0 <= after <= 16 or before + after > 20:
+        return JsonResponse({'error': 'Slice window exceeds the bounded limit.'}, status=400)
+    if index < 0 or index > 2147483647:
+        raise Http404
+    start = index if page_size else max(0, index - before)
+    stop = index + page_size if page_size else index + after + 1
+    normalized = normalized_case(blog_id)
+    if normalized is not None:
+        from users.models import Image
+        from django.db.models import Count, Min, Max
+        series = normalized.series.filter(plane=plane).first()
+        if series is None:
+            raise Http404
+        rows = Image.objects.filter(series=series)
+        stats = rows.aggregate(total=Count('pk'), first=Min('position'), last=Max('position'))
+        total = stats['total']
+        expected = series.expected_image_count
+        if expected is None or total != expected or (total and (stats['first'] != 0 or stats['last'] != total - 1)):
+            return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
+        if index >= total:
+            raise Http404
+        keys = list(rows.filter(position__gte=start, position__lt=stop).order_by('position').values_list('object_key', flat=True))
+        if len(keys) != min(stop, total) - start:
+            return JsonResponse({'error': 'Image projection unavailable.'}, status=503)
+    else:
+        from django.db.models import Count, Window
+        field = plane + '_images'
+        # COUNT OVER is evaluated before LIMIT/OFFSET: total and bounded keys in
+        # one DB round trip. The FK already ties every returned row to this case.
+        rows = (FilePost.objects.filter(post_id=blog_id)
+                .exclude(**{field: None}).exclude(**{field: ''})
+                .annotate(series_total=Window(expression=Count('pk'))).order_by('pk'))
+        batch = list(rows.values_list(field, 'series_total')[start:stop])
+        if not batch:
+            raise Http404
+        total = batch[0][1]
+        if index >= total:
+            raise Http404
+        keys = [key for key, _ in batch]
+    ttl = settings.R2_SIGNED_URL_SECONDS if settings.MEDIA_STORAGE == 'r2' else 300
+    return JsonResponse({'index': index, 'total': total, 'ttl': ttl,
+                         'images': [{'index': start + offset, 'url': default_storage.url(key)} for offset, key in enumerate(keys)]})
+
+
 
 def search(request):
     query = request.GET.get('q')
     post_images = {}
 
     if query:
-        posts = Post.objects.filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-date_posted')
-        post_images = retrieve_first_post_image(posts)
+        posts = case_cards().filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-date_posted', '-pk')
     else:
         posts = Post.objects.none()
 
     paginator = Paginator(posts, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    post_images = retrieve_first_post_image(page_obj.object_list)
 
     return render(request, 'blog/search_blog.html', {'posts': posts, 'post_images': post_images, 'page_obj': page_obj, 'query': query})
 
@@ -119,88 +194,23 @@ def edit_blog(request, blog_id):
             header_image = request.FILES.get('header_image')
 
             if form.is_valid() and form2.is_valid():
-                form.save()
-                post_instance = Post.objects.get(id=blog_id)
-                file_instance = FilePost.objects.filter(post=post_instance)
-                file_instance.all().delete()
-                image_format = form2.cleaned_data['format']
-                accepted_data_use = form2.cleaned_data['accepted_data_use']
-                cie_11_tagging = form2.cleaned_data['cie_11_tagging']
-                interested_region = form2.cleaned_data['interested_region']
-                other_interested_region = form2.cleaned_data['other_interested_region']
-                axial_description = form2.cleaned_data['axial_description']
-                coronal_description = form2.cleaned_data['coronal_description']
-                sagital_description = form2.cleaned_data['sagital_description']
-                error = False
-
-                if accepted_data_use == 'No':
-                    cie_11_tagging = None
-                    interested_region = None
-                    other_interested_region = None
-
-                if image_format == 'DICOM':
-                    try:
-                        image_header_dicom = pydicom.dcmread(header_image)
-                        image_header_array = image_header_dicom.pixel_array.astype(float)
-                        new_image_header = Image.fromarray(image_header_array)
-                        new_image_header = new_image_header.convert('L')
-                        output_filename_header = header_image.name.split('.')[0] + '.jpg'
-                        output_path_image_header = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header)
-                        os.makedirs(os.path.dirname(output_path_image_header), exist_ok=True)
-                        new_image_header.save(output_path_image_header, format='JPEG')
-                        output_path_image_header = output_path_image_header.replace('media/', '')
-
-                        if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                            FilePost.objects.create(post=post_instance, format=image_format, header_image=output_path_image_header, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-
-
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                dicom_data = pydicom.dcmread(image)
-                                image_array = dicom_data.pixel_array.astype(float)
-                                img = Image.fromarray(image_array)
-                                img = img.convert('L')
-                                output_filename = image.name.split('.')[0] + '.jpg'
-                                output_path_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename)
-                                os.makedirs(os.path.dirname(output_path_image), exist_ok=True)
-                                if accepted_data_use == 'Si':
-                                    output_path_dicom_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name)
-                                    dicom_data.save_as(output_path_dicom_image)
-                                img.save(output_path_image, format='JPEG')
-                                output_path_image = output_path_image.replace('media/', '')
-
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, axial_description=axial_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, sagital_description=sagital_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                else:
-                                    FilePost.objects.create(coronal_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, coronal_description=coronal_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                    except:
-                        error = True
-
-                else:
-                    if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                        FilePost.objects.create(post=post_instance, format=image_format, header_image=header_image)
-                    try:
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=image, post=post_instance, format=image_format, header_image=header_image, axial_description=axial_description)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=image, post=post_instance, format=image_format, header_image=header_image, sagital_description=sagital_description)
-                                else:
-                                    FilePost.objects.create(coronal_images=image, post=post_instance, format=image_format, header_image=header_image, coronal_description=coronal_description)
-                    except:
-                        error = True
-
-                if not error:
-                    post = get_object_or_404(Post, id=blog_id)
-                    return redirect('blog:blog_page', blog_name=post.title, blog_id=blog_id)
-
-                else:
-                    message = 'Error al editar la entrada. Por favor intenta de nuevo.'
-                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': message, 'error': error})
-
+                try:
+                    prepared = prepare_images(form2.cleaned_data, {
+                        'header_image': [header_image], 'axial_images': axial_images,
+                        'coronal_images': coronal_images, 'sagital_images': sagital_images})
+                    with transaction.atomic():
+                        post_instance = form.save()
+                        previous_ids = list(FilePost.objects.filter(post=post_instance).values_list('pk', flat=True))
+                        object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
+                        FilePost.objects.filter(pk__in=previous_ids).delete()
+                        if settings.CASE_MEDIA_DUAL_WRITE:
+                            sync_uploaded_case(post_instance.pk, object_metadata)
+                    return redirect('blog:blog_page', blog_name=post_instance.title, blog_id=post_instance.pk)
+                except ValidationError as error:
+                    form2.add_error(None, error)
+                except Exception:
+                    form2.add_error(None, 'Storage failed. Case changes were not saved. Contact the administrator before retrying.')
+                return render(request, 'blog/edit_blog_page.html', {'form': form, 'form2': form2, 'post': post, 'post_id': post.pk, 'editing': True, 'error': True, 'message': 'No se guardaron los cambios de la entrada.'})
 
             else:
                 content = request.POST.get('content')

@@ -3,21 +3,28 @@ import pycountry
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Post, FilePost, UserProfile
+from .models import Post, FilePost, UserProfile, COUNTRY_CHOICES
+from .email_policy import normalized_users
 from django.db.models.fields import BLANK_CHOICE_DASH
 
 
 
 class SignupForm (UserCreationForm):
 
-    email = forms.EmailField()
-    username = forms.CharField(max_length=30, error_messages={'required': 'Por favor ingresa tu nombre de usuario'})
+    email = forms.EmailField(label="Correo electrónico")
+    username = forms.CharField(label='Nombre de usuario', max_length=30, error_messages={'required': 'Por favor ingresa tu nombre de usuario'})
     password1 = forms.CharField(label='Contraseña', widget=forms.PasswordInput)
     password2 = forms.CharField(label='Confirmar contraseña', widget=forms.PasswordInput)
 
     class Meta:
         model = User
         fields = ('username', 'email', 'password1', 'password2')
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip().lower()
+        if normalized_users(email).exists():
+            raise forms.ValidationError('El correo ya existe')
+        return email
 
     def clean_username(self):
 
@@ -42,8 +49,6 @@ class SignupForm (UserCreationForm):
         if password1 != password2:
             raise forms.ValidationError('Las contraseñas no coinciden')
 
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError('El correo ya existe')
 
         if password1 and len(password1) < 8:
             raise forms.ValidationError('La contraseña debe tener al menos 8 caracteres')
@@ -61,7 +66,7 @@ class SignupForm (UserCreationForm):
             return cleaned_data
 
 class UserUpdateForm(forms.Form):
-    user_country = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(country.name, country.name) for country in pycountry.countries], label='País', required=False)
+    user_country = forms.ChoiceField(choices=BLANK_CHOICE_DASH + COUNTRY_CHOICES, label='País', required=False)
     user_academic_year = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(academic_year, academic_year) for academic_year in UserProfile.academic_year_list], label='Año de formación', required=False)
     user_work_location = forms.CharField(max_length=100, required=False, label='Centro de trabajo')
     user_medical_specialty = forms.ChoiceField(choices=BLANK_CHOICE_DASH + [(medical_specialty, medical_specialty) for medical_specialty in UserProfile.medical_specialty_list], label='Especialidad médica', required=False)
@@ -71,11 +76,11 @@ class UserUpdateForm(forms.Form):
         fields = ['user_country', 'user_academic_year', 'user_work_location', 'user_medical_specialty']
 
 class LoginForm(forms.Form):
-    email = forms.EmailField()
-    password = forms.CharField(widget=forms.PasswordInput)
+    email = forms.EmailField(label="Correo electrónico")
+    password = forms.CharField(label='Contraseña', widget=forms.PasswordInput)
 
 class ResetPasswordForm(forms.Form):
-    email = forms.EmailField()
+    email = forms.EmailField(label="Correo electrónico")
 
 class ChangePasswordForm(forms.Form):
     password1 = forms.CharField(label='Contraseña', widget=forms.PasswordInput)

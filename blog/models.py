@@ -13,6 +13,7 @@ class Post(models.Model):
     )
 
     MEDICAL_FINDINGS_CHOICES = (
+        ('Sin evaluar', 'Sin evaluar'),
         ('Alta (confirmación anatomopatológica/quirúrgica)', 'Alta (confirmación anatomopatológica/quirúrgica)'),
         ('Moderada', 'Moderada'),
         ('Baja', 'Baja'),
@@ -27,13 +28,20 @@ class Post(models.Model):
     clinical_case = models.TextField(blank=True, null=True)
     clinical_signs = models.TextField(blank=True, null=True)
     doppler = models.TextField(blank=True, null=True)
-    medical_findings = models.CharField(max_length=100, choices=MEDICAL_FINDINGS_CHOICES, default='Alta (confirmación anatomopatológica/quirúrgica)')
+    medical_findings = models.CharField(max_length=100, choices=MEDICAL_FINDINGS_CHOICES, default='Sin evaluar')
     preparation = models.TextField(blank=True, null=True)
     sequential = models.TextField(blank=True, null=True)
     pediatrics = models.TextField(blank=True, null=True)
     medical_report = models.TextField(blank=True, null=True)
     seram_link = models.URLField(blank=True, null=True)
     radiopedia_link = models.URLField(blank=True, null=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['-date_posted', '-id'], name='post_recent_idx')]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(category__in=['Abdomen', 'Torax', 'Ginecología', 'Pediatría', 'Neurología', 'Musculoesquelético', 'Otras']), name='post_category_valid'),
+            models.CheckConstraint(condition=models.Q(medical_findings__in=['', 'Sin evaluar', 'Alta (confirmación anatomopatológica/quirúrgica)', 'Moderada', 'Baja']), name='post_confidence_valid'),
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

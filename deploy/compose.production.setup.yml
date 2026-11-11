@@ -1,0 +1,6 @@
+# Explicit collectstatic job only. This does not run migrations or start a tunnel.
+services:
+  web:
+    restart: 'no'
+    volumes:
+      - production_static:/app/.local/static:rw

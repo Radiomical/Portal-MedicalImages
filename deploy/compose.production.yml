@@ -1,0 +1,56 @@
+name: portal-production
+services:
+  web:
+    image: ${PORTAL_IMAGE:?Set an explicit tested portal image tag}
+    restart: unless-stopped
+    env_file: ${PORTAL_PRODUCTION_ENV_FILE:?Set the private application environment path}
+    environment:
+      DJANGO_SETTINGS_MODULE: portal.settings
+      DEBUG: 'false'
+      DB_ENGINE: postgresql
+      DATABASE_SSLMODE: verify-full
+      DATABASE_SSLROOTCERT: /run/certs/database-ca.pem
+      MEDIA_STORAGE: r2
+      TRUST_PROXY_HTTPS: 'true'
+      SECURE_SSL_REDIRECT: 'true'
+      SECURE_COOKIES: 'true'
+      STATIC_ROOT: /app/.local/static
+    # No ports or host networking. Egress is needed for Azure, R2 and SMTP.
+    networks: [application, web_egress]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=128m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: 1.0
+    mem_limit: 768m
+    volumes:
+      - production_static:/app/.local/static:ro
+      - ${PORTAL_DATABASE_CA_FILE:?Set the PostgreSQL CA bundle path}:/run/certs/database-ca.pem:ro
+    healthcheck:
+      test: [CMD, /opt/venv/bin/python, -c, "import socket; socket.create_connection(('127.0.0.1',8081),2).close()"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 15s
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    restart: unless-stopped
+    env_file: ${PORTAL_TUNNEL_ENV_FILE:?Set the private connector-only environment path}
+    command: [tunnel, --no-autoupdate, run]
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [application, tunnel_egress]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: 0.5
+    mem_limit: 192m
+networks:
+  application:
+    internal: true
+  web_egress: {}
+  tunnel_egress: {}
+volumes:
+  production_static:

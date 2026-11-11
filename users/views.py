@@ -1,12 +1,14 @@
-import pydicom
+from django.core.exceptions import ValidationError
+from users.uploads import prepare_images, store_case_images
+from users.case_media import sync_uploaded_case
 import os
-from PIL import Image
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.hashers import make_password
-from django.core.mail import send_mail
-from django.db import transaction
+from django.core.mail import EmailMessage
+from django.db import transaction, IntegrityError
+from .email_policy import email_user
 from django.contrib.sites.shortcuts import get_current_site
 from django.conf import settings
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -18,7 +20,6 @@ from .forms import SignupForm, LoginForm, ResetPasswordForm, ChangePasswordForm,
 from .models import Post, FilePost, UserProfile
 from django.contrib.auth.models import User
 from blog.models import Post
-from blog.views import retrieve_first_post_image
 
 def login(request):
     if request.method == 'GET':
@@ -32,7 +33,7 @@ def login(request):
     elif request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
-            user = User.objects.filter(email=form.cleaned_data['email']).first()
+            user = email_user(form.cleaned_data['email'])
             if user and user.check_password(form.cleaned_data['password']):
                 if user.is_active:
                     auth_login(request, user)
@@ -48,14 +49,11 @@ def login(request):
         return redirect('blog:home')
 
 def logout(request):
-    if request.method == 'GET':
-        if request.user.is_authenticated:
-            auth_logout(request)
-            return redirect(reverse('users:login'))
-        else:
-            return redirect(reverse('users:login'))
-    else:
-        return redirect('blog:home')
+    if request.method != 'POST':
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['POST'])
+    auth_logout(request)
+    return redirect(reverse('users:login'))
 
 def signup(request):
     if request.method == 'GET':
@@ -71,9 +69,13 @@ def signup(request):
             user = form.save(commit=False)
             user.password = make_password(form.cleaned_data['password1'])
             user.is_active = False
-            user.save()
-
-            UserProfile.objects.create(user=user)
+            try:
+                with transaction.atomic():
+                    user.save()
+                    UserProfile.objects.create(user=user)
+            except IntegrityError:
+                form.add_error(None, 'No se pudo crear la cuenta. Comprueba los datos e inténtalo de nuevo.')
+                return render(request, 'users/signup.html', {'form': form})
 
             current_site = get_current_site(request)
 
@@ -85,13 +87,10 @@ def signup(request):
                 'token': account_activation_token.make_token(user),
             })
 
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
+            EmailMessage(
+                subject, message, settings.DEFAULT_FROM_EMAIL, [user.email],
+                reply_to=[settings.DEFAULT_REPLY_TO_EMAIL] if settings.DEFAULT_REPLY_TO_EMAIL else [],
+            ).send(fail_silently=False)
 
             if user.email:
                 msg = 'Usuario creado correctamente. Verifica tu correo electrónico para activar la cuenta.'
@@ -120,7 +119,7 @@ def update_user_profile(request):
             form = ChangePasswordForm()
             form2 = UserUpdateForm(request.POST)
             if form2.is_valid():
-                user = User.objects.get(email=request.user.email)
+                user = request.user
                 country = form2.cleaned_data['user_country']
                 academic_year = form2.cleaned_data['user_academic_year']
                 work_location = form2.cleaned_data['user_work_location']
@@ -153,7 +152,7 @@ def user_dashboard(request):
             form = ChangePasswordForm(request.POST)
             form2 = UserUpdateForm()
             if form.is_valid():
-                user = User.objects.get(email=request.user.email)
+                user = request.user
                 user.password = make_password(form.cleaned_data['password1'])
                 user.save()
 
@@ -189,97 +188,23 @@ def new_post(request):
             header_image = request.FILES.get('header_image')
 
             if form.is_valid() and form2.is_valid():
-                title = form.cleaned_data['title']
-                content = form.cleaned_data['content']
-                category = form.cleaned_data['category']
-                image_format = form2.cleaned_data['format']
-                fisiopathology = form.cleaned_data['fisiopathology']
-                clinical_case = form.cleaned_data['clinical_case']
-                clinical_signs = form.cleaned_data['clinical_signs']
-                doppler = form.cleaned_data['doppler']
-                sequential = form.cleaned_data['sequential']
-                preparation = form.cleaned_data['preparation']
-                pediatrics = form.cleaned_data['pediatrics']
-                medical_report = form.cleaned_data['medical_report']
-                seram_link = form.cleaned_data['seram_link']
-                radiopedia_link = form.cleaned_data['radiopedia_link']
-                accepted_data_use = form2.cleaned_data['accepted_data_use']
-                cie_11_tagging = form2.cleaned_data['cie_11_tagging']
-                interested_region = form2.cleaned_data['interested_region']
-                other_interested_region = form2.cleaned_data['other_interested_region']
-                axial_description = form2.cleaned_data['axial_description']
-                coronal_description = form2.cleaned_data['coronal_description']
-                sagital_description = form2.cleaned_data['sagital_description']
-                error = False
-
-                if accepted_data_use == 'No':
-                    cie_11_tagging = None
-                    interested_region = None
-                    other_interested_region = None
-
-                post_instance = Post.objects.create(title=title, content=content, category=category, author=request.user, fisiopathology=fisiopathology, clinical_case=clinical_case, clinical_signs=clinical_signs, doppler=doppler, preparation=preparation, pediatrics=pediatrics, medical_report=medical_report, seram_link=seram_link, radiopedia_link=radiopedia_link)
-
-                if image_format == 'DICOM':
-                    try:
-                        image_header_dicom = pydicom.dcmread(header_image)
-                        image_header_array = image_header_dicom.pixel_array.astype(float)
-                        new_image_header = Image.fromarray(image_header_array)
-                        new_image_header = new_image_header.convert('L')
-                        output_filename_header = header_image.name.split('.')[0] + '.jpg'
-                        output_path_image_header = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename_header)
-                        os.makedirs(os.path.dirname(output_path_image_header), exist_ok=True)
-                        new_image_header.save(output_path_image_header, format='JPEG')
-                        output_path_image_header = output_path_image_header.replace('media/', '')
-
-                        if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                            FilePost.objects.create(post=post_instance, format=image_format, header_image=output_path_image_header, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-
-
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                dicom_data = pydicom.dcmread(image)
-                                image_array = dicom_data.pixel_array.astype(float)
-                                img = Image.fromarray(image_array)
-                                img = img.convert('L')
-                                output_filename = image.name.split('.')[0] + '.jpg'
-                                output_path_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, output_filename)
-                                os.makedirs(os.path.dirname(output_path_image), exist_ok=True)
-                                if accepted_data_use == 'Si':
-                                    output_path_dicom_image = 'media/images/user_{0}/post_{1}/{2}'.format(post_instance.author.username, post_instance.pk, image.name)
-                                    dicom_data.save_as(output_path_dicom_image)
-                                img.save(output_path_image, format='JPEG')
-                                output_path_image = output_path_image.replace('media/', '')
-
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, axial_description=axial_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, sagital_description=sagital_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                                else:
-                                    FilePost.objects.create(coronal_images=output_path_image, post=post_instance, format=image_format, header_image=output_path_image_header, coronal_description=coronal_description, accepted_data_use=accepted_data_use, cie_11_tagging=cie_11_tagging, interested_region=interested_region, other_interested_region=other_interested_region)
-                    except:
-                        error = True
-
-                else:
-                    if not [x for x in (axial_images, sagital_images, coronal_images) if x]:
-                        FilePost.objects.create(post=post_instance, format=image_format, header_image=header_image)
-                    try:
-                        for image_set in [axial_images, sagital_images, coronal_images]:
-                            for image in image_set:
-                                if image_set is axial_images:
-                                    FilePost.objects.create(axial_images=image, post=post_instance, format=image_format, header_image=header_image, axial_description=axial_description)
-                                elif image_set is sagital_images:
-                                    FilePost.objects.create(sagital_images=image, post=post_instance, format=image_format, header_image=header_image, sagital_description=sagital_description)
-                                else:
-                                    FilePost.objects.create(coronal_images=image, post=post_instance, format=image_format, header_image=header_image, coronal_description=coronal_description)
-                    except:
-                        error = True
-
-                if not error:
-                    message = 'Entrada creada correctamente.'
-                else:
-                    message = 'Error al crear la entrada. Por favor intenta de nuevo.'
-
-                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': message, 'error': error})
+                try:
+                    prepared = prepare_images(form2.cleaned_data, {
+                        'header_image': [header_image], 'axial_images': axial_images,
+                        'coronal_images': coronal_images, 'sagital_images': sagital_images})
+                    with transaction.atomic():
+                        post_instance = form.save(commit=False)
+                        post_instance.author = request.user
+                        post_instance.save()
+                        object_metadata = store_case_images(post_instance, form2.cleaned_data, prepared)
+                        if settings.CASE_MEDIA_DUAL_WRITE:
+                            sync_uploaded_case(post_instance.pk, object_metadata)
+                    return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'Entrada creada.', 'error': False})
+                except ValidationError as error:
+                    form2.add_error(None, error)
+                except Exception:
+                    form2.add_error(None, 'Error de almacenamiento. No se guardó ninguna entrada. Contacta con el administrador antes de volver a intentarlo.')
+                return render(request, 'users/create_posts.html', {'form': form, 'form2': form2, 'message': 'No se guardó ninguna entrada.', 'error': True})
             else:
                 content = request.POST.get('content')
                 title = request.POST.get('title')
@@ -326,7 +251,7 @@ def reset_password(request):
     elif request.method == 'POST':
         form = ResetPasswordForm(request.POST)
         if form.is_valid():
-            user = User.objects.filter(email=form.cleaned_data['email']).first()
+            user = email_user(form.cleaned_data['email'])
             if user:
                 user.save()
 
@@ -340,13 +265,10 @@ def reset_password(request):
                     'token': reset_password_token.make_token(user),
                 })
 
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                    fail_silently=False,
-                )
+                EmailMessage(
+                    subject, message, settings.DEFAULT_FROM_EMAIL, [user.email],
+                    reply_to=[settings.DEFAULT_REPLY_TO_EMAIL] if settings.DEFAULT_REPLY_TO_EMAIL else [],
+                ).send(fail_silently=False)
 
                 return render(request, 'users/reset_password.html', {'message': 'Si la cuenta existe, se enviará un correo electrónico con las instrucciones para restablecer la contraseña.'})
             else:
@@ -377,10 +299,7 @@ def reset_password_confirm(request, uidb64, token, *args, **kwargs):
                 else:
                     return render(request, 'users/reset_password.html', {'form': form, 'change_password': True, 'uidb64': uidb64, 'token': token})
             else:
-                posts = Post.objects.order_by('-date_posted')[:5]
-                post_images = retrieve_first_post_image(posts)
-
-                return render(request, 'blog/home.html', {'posts': posts, 'post_images': post_images})
+                return redirect(reverse('blog:home'))
         else:
             return redirect(reverse('blog:home'))
     else:

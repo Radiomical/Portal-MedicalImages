@@ -1,0 +1,87 @@
+name: Portal checks
+on:
+  pull_request:
+    branches: [next]
+  push:
+    branches: [next]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
+        env:
+          POSTGRES_DB: portal_ci
+          POSTGRES_USER: portal_ci
+          POSTGRES_PASSWORD: ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U portal_ci -d portal_ci"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13.17'
+      - run: python -m pip install --require-hashes -r requirements.txt
+      - run: pip install pip-audit==2.10.1
+      - run: pip-audit -r requirements.txt
+      - name: Test bounded viewer navigation
+        run: node --test tests/js/viewer.test.cjs
+      - run: python scripts/test-compose-config.py
+      - run: python scripts/test-runtime-artifact.py
+      - run: python manage.py check --settings=portal.settings_test
+      - run: python manage.py test tests --settings=portal.settings_test --noinput
+      - run: python manage.py test tests --settings=portal.settings_ci_postgres --noinput
+      - run: python manage.py makemigrations --check --dry-run --settings=portal.settings_test
+      - run: docker build --tag portal:0.1.0-distroless-ci .
+      - name: Smoke-test the final nonroot runtime
+        run: |
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,size=64m -v "$PWD/scripts/container-smoke.py:/checks/smoke.py:ro" portal:0.1.0-distroless-ci /checks/smoke.py
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,size=64m -v "$PWD/tests:/app/tests:ro" portal:0.1.0-distroless-ci manage.py test tests --settings=portal.settings_test --noinput
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --network host --tmpfs /tmp:rw,size=64m -v "$PWD/tests:/app/tests:ro" portal:0.1.0-distroless-ci manage.py test tests --settings=portal.settings_ci_postgres --noinput
+          docker run --rm --read-only --cap-drop ALL --tmpfs /tmp:rw,size=64m --tmpfs /app/.local/static:rw,uid=65532,gid=65532,size=64m portal:0.1.0-distroless-ci manage.py collectstatic --settings=portal.settings_test --noinput
+      - run: docker build --file Dockerfile.slim-baseline --tag portal:0.1.0-slim-baseline-ci .
+      - name: Install checksum-verified Trivy
+        run: |
+          curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz -o /tmp/trivy.tar.gz
+          echo 'bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf  /tmp/trivy.tar.gz' | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf /tmp/trivy.tar.gz -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+      - name: Audit both images and gate fixable high/critical findings
+        run: ./scripts/image-audit.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: image-audit
+          path: image-audit/
+          retention-days: 14
+      - name: Export the exact audited runtime on next
+        shell: bash
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-artifact
+          image="portal-medicalimages:next-${GITHUB_SHA}"
+          docker tag portal:0.1.0-distroless-ci "$image"
+          docker image inspect "$image" > runtime-artifact/image-inspect.json
+          docker save "$image" | gzip -1 > runtime-artifact/runtime.tar.gz
+          gzip -t runtime-artifact/runtime.tar.gz
+          tar -tzf runtime-artifact/runtime.tar.gz > /dev/null
+          (cd runtime-artifact && sha256sum runtime.tar.gz image-inspect.json > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'push' && github.ref == 'refs/heads/next'
+        with:
+          name: audited-runtime-${{ github.sha }}
+          path: runtime-artifact/
+          retention-days: 2
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - run: ./scripts/secret-scan.sh

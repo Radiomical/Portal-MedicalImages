@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('xxx/', admin.site.urls),
+    path(settings.ADMIN_URL_PATH, admin.site.urls),
     path('', include(('blog.urls', 'blog'), namespace='blog')),
     path('users/', include(('users.urls', 'users'), namespace='users')),
     path('api/', include(('api.urls', 'api'), namespace='api')),
