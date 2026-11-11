@@ -4,9 +4,9 @@ A Django portal for educational imaging cases and image-series browsing.
 
 ## Development status
 
-The `next` line contains the current refactor and is deployed through explicit, tested artifacts.
+The current release is **v1.0.0** on `main`, deployed through explicit, tested artifacts.
 The application targets Python 3.13.17 and Django 6.1.3. Dependencies and hashes
-are locked in `requirements.txt`. Changes still require isolated validation and an approved deployment. Portable synthetic-preview and direct-tunnel production recipes are described in [deploy/README.md](deploy/README.md).
+are locked in `requirements.txt`. Changes still require isolated validation and an approved deployment. Portable synthetic-preview and direct-tunnel production recipes are described in [deploy/README.md](deploy/README.md). New work continues on the `next` branch and reaches `main` through reviewed promotion pull requests.
 
 ## Local checks
 
